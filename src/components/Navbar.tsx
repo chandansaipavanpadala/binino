@@ -1,42 +1,89 @@
 import React from 'react';
-import { Cpu } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAppContext } from '../context/AppContext';
+import { Cpu, Github, HelpCircle } from 'lucide-react';
 
-interface NavbarProps {
-  isDemoMode: boolean;
-  setIsDemoMode: (val: boolean) => void;
-}
+export const Navbar: React.FC = () => {
+  const navigate = useNavigate();
+  const { isDemoMode, setIsDemoMode } = useAppContext();
 
-export const Navbar: React.FC<NavbarProps> = ({ isDemoMode, setIsDemoMode }) => {
   return (
-    <header className="w-full bg-[#0A0A0F] border-b border-[#1E1E2E] py-4 px-6 flex items-center justify-between">
-      <div className="flex items-center space-x-3">
-        <div className="p-2 bg-[#1E1E2E] rounded-md border border-[#1E1E2E] flex items-center justify-center">
-          <Cpu className="h-5 w-5 text-[#00FFC8]" />
+    <header
+      className="w-full flex items-center justify-between px-6 select-none bg-[#111111]"
+      style={{
+        height: '48px',
+        borderBottom: '1px solid var(--border-subtle)',
+      }}
+    >
+      {/* Left: Brand & Version */}
+      <div className="flex items-center space-x-3 cursor-pointer" onClick={() => navigate('/')}>
+        <div
+          className="p-1 rounded flex items-center justify-center bg-[#1A1A1A]"
+          style={{ border: '1px solid var(--border-subtle)' }}
+        >
+          <Cpu className="h-4 w-4" style={{ color: 'var(--accent)' }} />
         </div>
-        <span className="text-xl font-bold tracking-tight text-white font-sans">
-          Binino<span className="text-[#00FFC8]">.</span>
+        <span className="text-sm font-semibold tracking-tight font-sans text-[#F0F0F0]">
+          Binino<span style={{ color: 'var(--text-muted)' }}>.</span>
+        </span>
+        <span
+          className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded-full bg-[#1A1A1A] text-[#888888]"
+          style={{ border: '1px solid var(--border-subtle)' }}
+        >
+          v1.0.0
         </span>
       </div>
-      
-      <div className="flex items-center space-x-4">
+
+      {/* Right: Controls & Navigation */}
+      <div className="flex items-center space-x-3">
         {/* Demo Mode Toggle */}
         <button
           onClick={() => setIsDemoMode(!isDemoMode)}
-          className={`flex items-center space-x-1.5 px-3 py-1 text-xs font-medium rounded-md border transition-all ${
-            isDemoMode
-              ? 'border-[#00FFC8]/50 bg-[#00FFC8]/10 text-[#00FFC8]'
-              : 'border-[#1E1E2E] bg-[#0A0A0F] text-slate-400 hover:text-slate-200'
-          }`}
+          className="flex items-center space-x-1.5 px-2.5 py-1 text-[11px] font-medium rounded transition-all duration-150"
+          style={{
+            backgroundColor: isDemoMode ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+            border: `1px solid ${isDemoMode ? 'var(--accent)' : 'var(--border-subtle)'}`,
+            color: isDemoMode ? 'var(--text-primary)' : 'var(--text-secondary)',
+          }}
           title="Toggle Hardware Simulation Mode"
         >
-          <span>Demo Mode: {isDemoMode ? 'ON' : 'OFF'}</span>
+          <span
+            className="w-1.5 h-1.5 rounded-full"
+            style={{
+              backgroundColor: isDemoMode ? 'var(--status-live)' : 'var(--text-muted)',
+              boxShadow: isDemoMode ? '0 0 4px var(--status-live)' : 'none',
+            }}
+          />
+          <span>Demo Mode</span>
         </button>
 
-        <span className="px-2.5 py-1 text-xs font-mono font-medium rounded-full bg-[#1E1E2E] text-[#FFB347] border border-[#1E1E2E]">
-          v1.0.0
-        </span>
+        {/* Separator */}
+        <div className="w-[1px] h-4" style={{ backgroundColor: 'var(--border-subtle)' }} />
+
+        {/* User Manual Button */}
+        <button
+          onClick={() => navigate('/manual')}
+          className="p-1 rounded transition-colors hover:opacity-80"
+          style={{ color: 'var(--text-secondary)' }}
+          title="User Manual"
+        >
+          <HelpCircle className="h-4 w-4" />
+        </button>
+
+        {/* GitHub Link */}
+        <a
+          href="https://github.com/chandansaipavanpadala/binino"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-1 rounded transition-colors hover:opacity-80"
+          style={{ color: 'var(--text-secondary)' }}
+          title="GitHub Repository"
+        >
+          <Github className="h-4 w-4" />
+        </a>
       </div>
     </header>
   );
 };
 
+export default Navbar;

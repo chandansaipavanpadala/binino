@@ -250,26 +250,35 @@ export const CodeExplorer: React.FC<CodeExplorerProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`fixed inset-0 z-50 bg-[#0A0A0F]/80 backdrop-blur-sm flex items-center justify-center transition-all duration-150 ease-out select-none ${
+      className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-150 ease-out select-none bg-[rgba(8,8,8,0.8)] backdrop-blur-sm ${
         animate ? 'opacity-100' : 'opacity-0'
       }`}
     >
       <div
-        className={`w-full h-full bg-[#0A0A0F] text-[#E2E8F0] flex flex-col font-sans transition-all duration-150 ease-out ${
-          animate ? 'scale-100' : 'scale-[0.98]'
+        className={`w-full h-full flex flex-col font-sans transition-all duration-150 ease-out bg-[#080808] text-[#F0F0F0] ${
+          animate ? 'scale-100' : 'scale-[0.99]'
         }`}
       >
         {/* EXPLORER TOP BAR (40px) */}
-        <div className="h-10 bg-[#0B0B11] border-b border-[#1E1E2E] flex items-center justify-between px-4 flex-shrink-0">
-          
+        <div 
+          className="h-10 flex items-center justify-between px-4 flex-shrink-0 bg-[#111111]"
+          style={{ borderBottom: '1px solid var(--border-subtle)' }}
+        >
           {/* Left branding */}
           <div className="flex items-center gap-2">
-            <span className="text-[#00FFC8] font-bold text-xs uppercase tracking-widest">Binino</span>
-            <span className="text-[#4A5568] text-xs">/</span>
-            <span className="text-xs text-white/90 truncate font-mono max-w-[120px]" title={filename}>
+            <span className="font-bold text-xs uppercase tracking-widest" style={{ color: 'var(--accent)' }}>Binino</span>
+            <span style={{ color: 'var(--text-muted)' }} className="text-xs">/</span>
+            <span className="text-xs truncate font-mono max-w-[120px]" style={{ color: 'var(--text-primary)' }} title={filename}>
               {filename}
             </span>
-            <span className="px-2 py-0.5 text-[8px] font-extrabold uppercase tracking-widest text-[#00FFC8] bg-[#00FFC8]/10 rounded border border-[#00FFC8]/30">
+            <span 
+              className="px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest rounded border"
+              style={{
+                backgroundColor: 'rgba(232, 232, 232, 0.05)',
+                borderColor: 'var(--border-subtle)',
+                color: 'var(--text-secondary)'
+              }}
+            >
               {result.arch}
             </span>
           </div>
@@ -286,19 +295,34 @@ export const CodeExplorer: React.FC<CodeExplorerProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleCopyAllCCode}
-              className="h-7 px-2.5 bg-[#12121A] hover:bg-[#1C1C2C] border border-[#232334] text-[10px] text-white/80 font-semibold rounded transition-all active:scale-[0.98] duration-150"
+              className="h-7 px-2.5 text-[10px] font-semibold rounded transition-all active:scale-[0.98] duration-150"
+              style={{
+                border: '1px solid var(--border-subtle)',
+                backgroundColor: 'var(--bg-inset)',
+                color: 'var(--text-secondary)',
+              }}
             >
               Copy All C Code
             </button>
             <button
               onClick={handleExportReport}
-              className="h-7 px-2.5 bg-[#12121A] hover:bg-[#1C1C2C] border border-[#232334] text-[10px] text-white/80 font-semibold rounded transition-all active:scale-[0.98] duration-150"
+              className="h-7 px-2.5 text-[10px] font-semibold rounded transition-all active:scale-[0.98] duration-150"
+              style={{
+                border: '1px solid var(--border-subtle)',
+                backgroundColor: 'var(--bg-inset)',
+                color: 'var(--text-secondary)',
+              }}
             >
               Export Report
             </button>
             <button
               onClick={handleClose}
-              className="h-7 px-2.5 bg-[#2E161B] hover:bg-[#3E1A23] border border-[#4E222D] text-[10px] text-red-400 font-bold rounded transition-all active:scale-[0.98] duration-150"
+              className="h-7 px-2.5 text-[10px] font-bold rounded transition-all active:scale-[0.98] duration-150"
+              style={{
+                border: '1px solid var(--status-error)',
+                backgroundColor: 'rgba(248, 113, 113, 0.05)',
+                color: 'var(--status-error)',
+              }}
             >
               ✕ Close
             </button>
@@ -307,20 +331,23 @@ export const CodeExplorer: React.FC<CodeExplorerProps> = ({
 
         {/* Mobile Sub-Header Selector Tabs (<900px wide screen) */}
         {isMobile && (
-          <div className="flex bg-[#0B0B11] border-b border-[#1E1E2E] p-1 flex-shrink-0">
+          <div 
+            className="flex p-1 flex-shrink-0 bg-[#111111]"
+            style={{ borderBottom: '1px solid var(--border-subtle)' }}
+          >
             {(['navigator', 'code', 'hex'] as const).map((pane) => {
               const isActive = activeMobilePane === pane;
               return (
                 <button
                   key={pane}
                   onClick={() => setActiveMobilePane(pane)}
-                  className={`flex-1 py-1.5 text-[10px] uppercase font-bold tracking-wider rounded transition-all ${
-                    isActive
-                      ? 'bg-[#1E1E2E] text-[#00FFC8]'
-                      : 'text-[#718096] hover:text-white'
-                  }`}
+                  className="flex-1 py-1.5 text-[10px] uppercase font-bold tracking-wider rounded transition-all duration-150"
+                  style={{
+                    backgroundColor: isActive ? 'var(--bg-elevated)' : 'transparent',
+                    color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+                  }}
                 >
-                  {pane === 'navigator' ? 'Navigator' : pane === 'code' ? 'Code Viewer' : 'Hex Dump'}
+                  {pane === 'navigator' ? 'Navigator' : pane === 'code' ? 'Code' : 'Hex'}
                 </button>
               );
             })}
@@ -403,9 +430,10 @@ export const CodeExplorer: React.FC<CodeExplorerProps> = ({
                 {/* Resizable Vertical Splitter Bar */}
                 <div
                   onMouseDown={handleMouseDown}
-                  className={`w-1 cursor-col-resize hover:bg-[#00FFC8] select-none h-full z-20 flex-shrink-0 transition-colors ${
-                    isDragging ? 'bg-[#00FFC8]' : 'bg-[#1E1E2E]'
-                  }`}
+                  className={`w-1 cursor-col-resize h-full z-20 flex-shrink-0 transition-colors select-none`}
+                  style={{
+                    backgroundColor: isDragging ? 'var(--accent)' : 'var(--border-subtle)'
+                  }}
                 />
 
                 {/* Pane C: Hex Dump with Inner Error Boundary wrapping */}

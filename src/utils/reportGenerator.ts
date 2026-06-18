@@ -11,9 +11,9 @@ export const generateReportHtml = (result: AnalysisResult, filename: string): st
   // Format the function listings
   const functionRows = (result.functions || []).map(f => `
     <tr>
-      <td style="font-family: monospace; color: #00ffc8; width: 150px;">${f.address}</td>
-      <td style="font-weight: bold; color: #e2e8f0;">${f.name}</td>
-      <td style="color: #a0aec0; text-align: right;">${f.size ? f.size + ' B' : '—'}</td>
+      <td style="font-family: monospace; color: #e8e8e8; width: 150px;">${f.address}</td>
+      <td style="font-weight: bold; color: #f0f0f0;">${f.name}</td>
+      <td style="color: #888888; text-align: right;">${f.size ? f.size + ' B' : '—'}</td>
     </tr>
   `).join('');
 
@@ -28,10 +28,10 @@ export const generateReportHtml = (result: AnalysisResult, filename: string): st
               <span class="badge">${f.address}</span>
               <strong style="font-size: 14px; margin-left: 8px; font-family: monospace; color: #ffffff;">${f.name}</strong>
             </div>
-            <span style="font-size: 11px; color: #718096; font-family: monospace;">Size: ${f.size || 0} bytes</span>
+            <span style="font-size: 11px; color: #888888; font-family: monospace;">Size: ${f.size || 0} bytes</span>
           </div>
         </div>
-        <div style="overflow-x: auto; background-color: #0f0f14;">
+        <div style="overflow-x: auto; background-color: #0d0d0d;">
           <pre class="code-block"><code>${highlightedCode}</code></pre>
         </div>
       </div>
@@ -41,17 +41,17 @@ export const generateReportHtml = (result: AnalysisResult, filename: string): st
   // Format strings
   const stringRows = (result.strings || []).map(s => `
     <tr>
-      <td style="font-family: monospace; color: #00ffc8; width: 150px; white-space: nowrap;">${s.address}</td>
-      <td style="color: #ce9178; font-family: monospace; word-break: break-all;">"${escapeHtml(s.value)}"</td>
-      <td style="color: #718096; width: 100px; text-transform: uppercase; font-size: 10px; font-weight: bold;">${s.encoding || 'ASCII'}</td>
+      <td style="font-family: monospace; color: #e8e8e8; width: 150px; white-space: nowrap;">${s.address}</td>
+      <td style="color: #e8e8e8; font-family: monospace; word-break: break-all;">"${escapeHtml(s.value)}"</td>
+      <td style="color: #888888; width: 100px; text-transform: uppercase; font-size: 10px; font-weight: bold;">${s.encoding || 'ASCII'}</td>
     </tr>
   `).join('');
 
   // Format symbols
   const symbolRows = (result.symbols || []).map(sym => `
     <tr>
-      <td style="font-family: monospace; color: #00ffc8; width: 150px; white-space: nowrap;">${sym.address}</td>
-      <td style="font-family: monospace; font-weight: bold; color: #e2e8f0; word-break: break-all;">${sym.name}</td>
+      <td style="font-family: monospace; color: #e8e8e8; width: 150px; white-space: nowrap;">${sym.address}</td>
+      <td style="font-family: monospace; font-weight: bold; color: #f0f0f0; word-break: break-all;">${sym.name}</td>
       <td style="width: 100px;">
         <span class="badge-type">${sym.type || 'Unknown'}</span>
       </td>
@@ -66,8 +66,8 @@ export const generateReportHtml = (result: AnalysisResult, filename: string): st
   <title>Binino Security Audit Report - ${filename}</title>
   <style>
     body {
-      background-color: #0a0a0f;
-      color: #e2e8f0;
+      background-color: #080808;
+      color: #f0f0f0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       margin: 0;
       padding: 40px 20px;
@@ -78,12 +78,12 @@ export const generateReportHtml = (result: AnalysisResult, filename: string): st
       margin: 0 auto;
     }
     header {
-      border-bottom: 1px solid #1e1e2e;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
       padding-bottom: 24px;
       margin-bottom: 35px;
     }
     h1 {
-      color: #00ffc8;
+      color: #e8e8e8;
       margin: 0 0 12px 0;
       font-size: 26px;
       font-weight: 800;
@@ -95,17 +95,17 @@ export const generateReportHtml = (result: AnalysisResult, filename: string): st
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 20px;
       font-size: 13px;
-      color: #a0aec0;
+      color: #888888;
     }
     .meta-item strong {
       color: #ffffff;
       font-family: monospace;
     }
     h2 {
-      color: #e2e8f0;
+      color: #f0f0f0;
       font-size: 18px;
       font-weight: 700;
-      border-bottom: 1px solid #1e1e2e;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
       padding-bottom: 10px;
       margin-top: 45px;
       margin-bottom: 15px;
@@ -117,55 +117,55 @@ export const generateReportHtml = (result: AnalysisResult, filename: string): st
       border-collapse: collapse;
       margin-top: 15px;
       font-size: 13px;
-      background-color: #0f0f14/40;
+      background-color: rgba(255,255,255,0.02);
     }
     th, td {
       text-align: left;
       padding: 12px 16px;
-      border-bottom: 1px solid #1e1e2e;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
     }
     th {
-      color: #718096;
+      color: #888888;
       text-transform: uppercase;
       font-size: 10px;
       font-weight: 800;
       letter-spacing: 1px;
-      background-color: #0c0c12;
-      border-top: 1px solid #1e1e2e;
+      background-color: #111111;
+      border-top: 1px solid rgba(255,255,255,0.06);
     }
     tr:hover td {
-      background-color: #161622/30;
+      background-color: rgba(255,255,255,0.04);
     }
     .card {
-      border: 1px solid #1e1e2e;
+      border: 1px solid rgba(255,255,255,0.06);
       border-radius: 8px;
-      background-color: #0f0f14;
+      background-color: #111111;
       overflow: hidden;
     }
     .card-header {
-      background-color: #0b0b11;
+      background-color: #1a1a1a;
       padding: 12px 18px;
-      border-bottom: 1px solid #1e1e2e;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
     }
     .badge {
-      background-color: #162725;
-      color: #00ffc8;
+      background-color: rgba(255, 255, 255, 0.05);
+      color: #e8e8e8;
       padding: 3px 8px;
       border-radius: 4px;
       font-size: 11px;
       font-family: monospace;
       font-weight: bold;
-      border: 1px solid #1e433a;
+      border: 1px solid rgba(255, 255, 255, 0.15);
     }
     .badge-type {
-      background-color: #1a2333;
-      color: #569cd6;
+      background-color: rgba(255, 255, 255, 0.05);
+      color: #e8e8e8;
       padding: 3px 8px;
       border-radius: 4px;
       font-size: 11px;
       font-family: monospace;
       font-weight: bold;
-      border: 1px solid #23354c;
+      border: 1px solid rgba(255, 255, 255, 0.15);
     }
     .code-block {
       margin: 0;
@@ -173,24 +173,24 @@ export const generateReportHtml = (result: AnalysisResult, filename: string): st
       font-family: "JetBrains Mono", "Fira Code", monospace;
       font-size: 12px;
       line-height: 1.6;
-      color: #e2e8f0;
-      background-color: #0f0f14;
+      color: #f0f0f0;
+      background-color: #0d0d0d;
     }
     footer {
       margin-top: 80px;
       padding-top: 25px;
-      border-top: 1px solid #1e1e2e;
+      border-top: 1px solid rgba(255,255,255,0.06);
       text-align: center;
       font-size: 11px;
-      color: #4a5568;
+      color: #888888;
       letter-spacing: 0.5px;
     }
     a {
-      color: #00ffc8;
-      text-decoration: none;
+      color: #f0f0f0;
+      text-decoration: underline;
     }
     a:hover {
-      text-decoration: underline;
+      opacity: 0.8;
     }
   </style>
 </head>
@@ -235,7 +235,7 @@ export const generateReportHtml = (result: AnalysisResult, filename: string): st
         </tr>
       </thead>
       <tbody>
-        ${stringRows || '<tr><td colspan="3" style="text-align: center; color: #4a5568; padding: 24px;">No string constants extracted.</td></tr>'}
+        ${stringRows || '<tr><td colspan="3" style="text-align: center; color: #888888; padding: 24px;">No string constants extracted.</td></tr>'}
       </tbody>
     </table>
 
@@ -249,12 +249,12 @@ export const generateReportHtml = (result: AnalysisResult, filename: string): st
         </tr>
       </thead>
       <tbody>
-        ${symbolRows || '<tr><td colspan="3" style="text-align: center; color: #4a5568; padding: 24px;">No symbols resolved.</td></tr>'}
+        ${symbolRows || '<tr><td colspan="3" style="text-align: center; color: #888888; padding: 24px;">No symbols resolved.</td></tr>'}
       </tbody>
     </table>
 
     <footer>
-      Generated dynamically by <a href="https://github.com/chandansaipavanpadala/binino" target="_blank">Binino</a> · Browser-to-Hardware Reverse Engineering Toolkit.
+      Generated dynamically by <a href="https://github.com/chandansaipavanpadala/binino" target="_blank">Binino</a> · Built by Chandan Sai Pavan Padala · <a href="https://github.com/chandansaipavanpadala/binino" target="_blank">Star on GitHub</a>
     </footer>
   </div>
 </body>

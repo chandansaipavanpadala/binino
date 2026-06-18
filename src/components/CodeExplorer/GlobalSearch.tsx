@@ -119,7 +119,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Escape') {
       if (isOpen) {
-        e.stopPropagation(); // Stop propagation so index.tsx doesn't close the Explorer
+        e.stopPropagation();
         setIsOpen(false);
         setQuery('');
         inputRef.current?.blur();
@@ -156,16 +156,27 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder="Search functions, strings, symbols..."
-          className="w-full h-8 pl-8 pr-16 bg-[#161622] text-xs text-white rounded-md border border-[#232334] focus:outline-none focus:border-[#00FFC8] transition-colors"
+          className="w-full h-7 pl-8 pr-16 text-xs text-[#F0F0F0] rounded focus:outline-none transition-colors"
+          style={{
+            backgroundColor: 'var(--bg-inset)',
+            border: '1px solid var(--border-default)',
+          }}
         />
         {/* Search Icon */}
-        <span className="absolute left-2.5 top-2 text-[#718096]">
+        <span className="absolute left-2.5 top-2" style={{ color: 'var(--text-muted)' }}>
           <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
             <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
           </svg>
         </span>
         {/* Keyboard shortcut indicator */}
-        <div className="absolute right-2.5 top-1.5 hidden sm:flex items-center gap-0.5 text-[10px] text-[#4A5568] bg-[#0E0E15] px-1.5 py-0.5 rounded border border-[#1A1A26]">
+        <div 
+          className="absolute right-2 top-1 hidden sm:flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded border"
+          style={{
+            backgroundColor: 'var(--bg-elevated)',
+            borderColor: 'var(--border-subtle)',
+            color: 'var(--text-muted)'
+          }}
+        >
           <span>Ctrl</span>
           <span>+</span>
           <span>K</span>
@@ -175,7 +186,11 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
       {isOpen && flatResults.length > 0 && (
         <div
           ref={dropdownRef}
-          className="absolute z-[100] left-0 right-0 mt-1 max-h-80 overflow-y-auto bg-[#0E0E15]/95 backdrop-blur-md rounded-md border border-[#232334] shadow-2xl py-1"
+          className="absolute z-[100] left-0 right-0 mt-1 max-h-80 overflow-y-auto rounded shadow-2xl py-1"
+          style={{ 
+            backgroundColor: 'var(--bg-surface)', 
+            border: '1px solid var(--border-default)' 
+          }}
         >
           {flatResults.map((item, idx) => {
             const isHighlighted = idx === activeIndex;
@@ -184,31 +199,39 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
                 key={`${item.category}-${item.address}-${idx}`}
                 onClick={() => handleSelect(item)}
                 onMouseEnter={() => setActiveIndex(idx)}
-                className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-colors text-xs border-l-2 ${
-                  isHighlighted
-                    ? 'bg-[#1A1A2E] text-[#00FFC8] border-l-[#00FFC8]'
-                    : 'text-[#A0AEC0] border-l-transparent hover:bg-[#161622]/50 hover:text-white'
-                }`}
+                className="flex items-center justify-between px-3 py-2 cursor-pointer transition-colors text-xs border-l-2"
+                style={{
+                  backgroundColor: isHighlighted ? 'var(--bg-elevated)' : 'transparent',
+                  borderLeftColor: isHighlighted ? 'var(--accent)' : 'transparent',
+                  color: isHighlighted ? 'var(--text-primary)' : 'var(--text-secondary)'
+                }}
               >
                 <div className="flex flex-col gap-0.5 min-w-0 pr-4">
                   <span className="font-semibold truncate max-w-[280px]">
                     {item.name}
                   </span>
-                  <span className="text-[10px] text-[#718096] truncate">
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                     {item.detail}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="font-mono text-[10px] text-[#4FD1C5]/60 bg-[#17262B] px-1 py-0.5 rounded">
+                  <span 
+                    className="font-mono text-[9px] px-1 py-0.5 rounded"
+                    style={{
+                      backgroundColor: 'var(--bg-inset)',
+                      color: 'var(--text-muted)'
+                    }}
+                  >
                     {item.address}
                   </span>
-                  <span className={`text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border ${
-                    item.category === 'function'
-                      ? 'text-[#4EC9B0] bg-[#152F2C] border-[#1C3E3A]'
-                      : item.category === 'string'
-                      ? 'text-[#CE9178] bg-[#2E2421] border-[#3E302C]'
-                      : 'text-[#569CD6] bg-[#1F2C3D] border-[#293A50]'
-                  }`}>
+                  <span 
+                    className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border"
+                    style={{
+                      color: item.category === 'function' ? 'var(--status-live)' : item.category === 'string' ? 'var(--status-warn)' : 'var(--status-info)',
+                      backgroundColor: item.category === 'function' ? 'rgba(74, 222, 128, 0.05)' : item.category === 'string' ? 'rgba(245, 158, 11, 0.05)' : 'rgba(96, 165, 250, 0.05)',
+                      borderColor: item.category === 'function' ? 'rgba(74, 222, 128, 0.15)' : item.category === 'string' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(96, 165, 250, 0.15)',
+                    }}
+                  >
                     {item.category}
                   </span>
                 </div>
@@ -217,7 +240,14 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
           })}
           
           {/* Footer with keybind hints */}
-          <div className="flex items-center justify-between px-3 py-1.5 border-t border-[#1F1F2E] bg-[#0A0A0F] text-[9px] text-[#4A5568]">
+          <div 
+            className="flex items-center justify-between px-3 py-1.5 border-t text-[9px]"
+            style={{ 
+              borderTop: '1px solid var(--border-subtle)', 
+              backgroundColor: 'var(--bg-inset)', 
+              color: 'var(--text-muted)' 
+            }}
+          >
             <span>{flatResults.length} matches found</span>
             <div className="flex items-center gap-1.5">
               <span>↑↓ to navigate</span>
@@ -230,3 +260,5 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
     </div>
   );
 };
+
+export default GlobalSearch;

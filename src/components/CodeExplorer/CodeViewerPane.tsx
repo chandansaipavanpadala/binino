@@ -40,6 +40,7 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
     clearExplanation();
     setIsPanelOpen(false);
   }, [activeFunction, clearExplanation]);
+
   // Get active code block based on selected tab
   const code = useMemo(() => {
     if (!activeFunction) return '';
@@ -71,7 +72,6 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
   const handleLineClick = (lineNum: number) => {
     const formatted = `${filename}:${lineNum}`;
     navigator.clipboard.writeText(formatted);
-    // Silent confirmation, or we can flash something.
   };
 
   const codeLines = useMemo(() => {
@@ -80,41 +80,52 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
   }, [code]);
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#0F0F14] overflow-hidden">
+    <div className="flex-1 flex flex-col h-full overflow-hidden" style={{ backgroundColor: 'var(--bg-inset)' }}>
       {/* Simulated environment warning banner */}
       {result.simulated && (
-        <div className="bg-[#FEF3C7] text-[#92400E] border-b border-[#FDE68A] px-4 py-2 text-xs font-semibold flex items-center gap-2 select-none">
+        <div 
+          className="px-4 py-1.5 text-[11px] font-semibold flex items-center gap-2 select-none"
+          style={{ 
+            backgroundColor: 'rgba(245, 158, 11, 0.05)', 
+            borderColor: 'var(--status-warn)', 
+            borderBottom: '1px solid var(--border-subtle)', 
+            color: 'var(--status-warn)' 
+          }}
+        >
           <span>⚠ Simulated output — Ghidra not installed. Install Ghidra and re-run analysis for real results.</span>
         </div>
       )}
 
       {/* Toolbar & View Selectors */}
-      <div className="h-10 border-b border-[#1E1E2E] bg-[#0A0A0F] flex items-center justify-between px-3 select-none flex-shrink-0">
-        <div className="flex items-center gap-1">
+      <div 
+        className="h-10 flex items-center justify-between px-3 select-none flex-shrink-0 bg-[#111111]"
+        style={{ borderBottom: '1px solid var(--border-subtle)' }}
+      >
+        <div className="flex items-center gap-1 h-full">
           <button
             onClick={() => setActiveTab('c')}
-            className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
-              activeTab === 'c'
-                ? 'bg-[#1E1E2E] text-[#00FFC8]'
-                : 'text-[#718096] hover:text-white'
-            }`}
+            className="px-3 text-xs font-semibold transition-all duration-150 h-full border-b-2"
+            style={{
+              borderColor: activeTab === 'c' ? 'var(--accent)' : 'transparent',
+              color: activeTab === 'c' ? 'var(--text-primary)' : 'var(--text-secondary)'
+            }}
           >
             Pseudo-C
           </button>
           <button
             onClick={() => setActiveTab('asm')}
-            className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
-              activeTab === 'asm'
-                ? 'bg-[#1E1E2E] text-[#00FFC8]'
-                : 'text-[#718096] hover:text-white'
-            }`}
+            className="px-3 text-xs font-semibold transition-all duration-150 h-full border-b-2"
+            style={{
+              borderColor: activeTab === 'asm' ? 'var(--accent)' : 'transparent',
+              color: activeTab === 'asm' ? 'var(--text-primary)' : 'var(--text-secondary)'
+            }}
           >
             Assembly
           </button>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* PHASE 5: AI Explain button — send pseudo_c to Claude API here */}
+          {/* AI Explain button */}
           {activeFunction && activeTab === 'c' && (
             <button
               onClick={() => {
@@ -122,11 +133,16 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
                 explain(activeFunction.name, result.arch, result);
               }}
               disabled={explainStatus === 'loading' || explainStatus === 'streaming'}
-              className="flex items-center gap-1.5 px-3 py-1 bg-[#00FFC8]/10 border border-[#00FFC8] text-[#00FFC8] text-[10px] font-bold rounded hover:bg-[#00FFC8]/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed duration-150 focus-visible:ring-1 focus-visible:ring-[#00FFC8] focus-visible:outline-none"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed duration-150"
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid var(--border-strong)',
+                color: 'var(--text-primary)'
+              }}
               title="Decompile and explain logic using Claude AI"
               aria-label="Explain decompiled code with Claude AI"
             >
-              <svg className="w-3.5 h-3.5 fill-none stroke-current" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="w-3 h-3 fill-none stroke-current" strokeWidth="2.5" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-4.88 2.5 2.5 0 0 1 0-3.12A2.5 2.5 0 0 1 9.5 2Z" />
                 <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 0-3.12 3 3 0 0 0 0-4.88 2.5 2.5 0 0 0 0-3.12A2.5 2.5 0 0 0 14.5 2Z" />
               </svg>
@@ -135,11 +151,12 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
           )}
 
           {activeFunction && (
-            <div className="flex items-center gap-1 border-l border-[#1E1E2D] pl-3">
+            <div className="flex items-center gap-1 pl-3" style={{ borderLeft: '1px solid var(--border-subtle)' }}>
               {/* Copy Code */}
               <button
                 onClick={handleCopyAll}
-                className="p-1.5 text-[#718096] hover:text-[#00FFC8] rounded hover:bg-[#1E1E2E] transition-colors ti ti-copy"
+                className="p-1.5 rounded transition-all hover:text-white duration-150"
+                style={{ color: 'var(--text-secondary)' }}
                 title="Copy all code to clipboard"
                 aria-label="Copy code to clipboard"
               >
@@ -151,7 +168,8 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
               {/* Download Code */}
               <button
                 onClick={handleDownload}
-                className="p-1.5 text-[#718096] hover:text-[#00FFC8] rounded hover:bg-[#1E1E2E] transition-colors ti ti-download"
+                className="p-1.5 rounded transition-all hover:text-white duration-150"
+                style={{ color: 'var(--text-secondary)' }}
                 title={`Download as .${activeTab === 'c' ? 'c' : 'asm'}`}
                 aria-label="Download code to disk"
               >
@@ -163,11 +181,12 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
               {/* Word Wrap Toggle */}
               <button
                 onClick={() => setWordWrap(!wordWrap)}
-                className={`p-1.5 rounded transition-colors ti ti-text-wrap ${
-                  wordWrap
-                    ? 'text-[#00FFC8] bg-[#00FFC8]/10'
-                    : 'text-[#718096] hover:text-white hover:bg-[#1E1E2E]'
-                }`}
+                className="p-1.5 rounded transition-all duration-150"
+                style={{ 
+                  color: wordWrap ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  backgroundColor: wordWrap ? 'var(--bg-elevated)' : 'transparent',
+                  border: wordWrap ? '1px solid var(--border-default)' : '1px solid transparent'
+                }}
                 title="Toggle word wrap"
                 aria-label="Toggle code word wrap"
               >
@@ -181,16 +200,23 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
       </div>
 
       {/* Code Area with line numbers gutter */}
-      <div className="flex-1 overflow-auto bg-[#0F0F14] relative">
+      <div className="flex-1 overflow-auto relative" style={{ backgroundColor: 'var(--bg-inset)' }}>
         {activeFunction ? (
-          <div className="flex min-h-full min-w-full font-mono text-[11px] leading-5 select-text">
+          <div className="flex min-h-full min-w-full font-mono text-[10px] leading-5 select-text">
             {/* Gutter Line Numbers */}
-            <div className="select-none text-right pr-3 pl-2 text-[#4A5568] border-r border-[#1E1E2E] bg-[#0A0A0F] sticky left-0 z-10 w-12 flex-shrink-0 py-4">
+            <div 
+              className="select-none text-right pr-3 pl-2 sticky left-0 z-10 w-11 flex-shrink-0 py-4"
+              style={{
+                color: 'var(--text-muted)',
+                borderRight: '1px solid var(--border-subtle)',
+                backgroundColor: 'var(--bg-surface)'
+              }}
+            >
               {codeLines.map((_, i) => (
                 <div
                   key={i + 1}
                   onClick={() => handleLineClick(i + 1)}
-                  className="cursor-pointer hover:text-[#00FFC8] h-5 leading-5 select-none transition-colors"
+                  className="cursor-pointer hover:text-white h-5 leading-5 select-none transition-colors"
                   title="Click to copy filename:line"
                 >
                   {i + 1}
@@ -204,7 +230,7 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
             </div>
           </div>
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-[#718096] text-xs select-none">
+          <div className="w-full h-full flex items-center justify-center text-xs select-none" style={{ color: 'var(--text-muted)' }}>
             <span>← Select a function from the navigator to view its decompiled code.</span>
           </div>
         )}
@@ -212,19 +238,24 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
 
       {/* AI Explain Sliding Drawer Panel */}
       <div
-        className="border-t border-[#1E1E2E] bg-[#0A0A0F] transition-all duration-200 ease-out overflow-hidden flex flex-col flex-shrink-0"
+        className="transition-all duration-200 ease-out overflow-hidden flex flex-col flex-shrink-0"
         style={{
           maxHeight: isPanelOpen ? '260px' : '0px',
+          borderTop: isPanelOpen ? '1px solid var(--border-subtle)' : 'none',
+          backgroundColor: 'var(--bg-surface)'
         }}
       >
         {/* Panel Header */}
-        <div className="h-9 px-3 border-b border-[#1E1E2E] flex items-center justify-between select-none bg-[#0B0B11]">
+        <div 
+          className="h-9 px-3 flex items-center justify-between select-none bg-[#111111]"
+          style={{ borderBottom: '1px solid var(--border-subtle)' }}
+        >
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
               AI Analysis — {activeFunction?.name}
             </span>
             {(explainStatus === 'loading' || explainStatus === 'streaming') && (
-              <span className="w-3 h-3 border border-[#00FFC8] border-t-transparent rounded-full animate-spin"></span>
+              <span className="w-2.5 h-2.5 border rounded-full animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }}></span>
             )}
           </div>
           <button
@@ -232,7 +263,8 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
               setIsPanelOpen(false);
               clearExplanation();
             }}
-            className="text-slate-500 hover:text-white text-xs p-1"
+            className="text-xs p-1"
+            style={{ color: 'var(--text-muted)' }}
             aria-label="Close AI Explanation Panel"
           >
             ✕
@@ -240,9 +272,9 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
         </div>
 
         {/* Panel Body */}
-        <div className="flex-1 p-3 overflow-y-auto font-sans text-[13px] leading-[1.7] text-slate-300">
+        <div className="flex-1 p-3 overflow-y-auto font-sans text-xs leading-[1.6]" style={{ color: 'var(--text-primary)' }}>
           {explainStatus === 'loading' && (
-            <div className="text-slate-500 text-xs italic flex items-center gap-2">
+            <div className="text-xs italic flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
               <span>Retrieving AST context and querying decompiler AI model...</span>
             </div>
           )}
@@ -252,11 +284,22 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
           )}
 
           {explainStatus === 'error' && (
-            <div className="bg-[#FF4C4C]/10 border border-[#FF4C4C]/30 rounded p-3 text-xs text-red-400 flex flex-col gap-2">
+            <div 
+              className="rounded p-3 text-xs flex flex-col gap-2"
+              style={{ 
+                backgroundColor: 'rgba(248, 113, 113, 0.05)', 
+                border: '1px solid var(--status-error)', 
+                color: 'var(--status-error)' 
+              }}
+            >
               <div className="font-semibold">Explain Error: {errorMessage}</div>
               <button
                 onClick={() => explain(activeFunction!.name, result.arch, result)}
-                className="w-fit px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white font-bold rounded transition-colors text-[10px]"
+                className="w-fit px-2.5 py-1 text-[10px] font-bold rounded transition-colors"
+                style={{
+                  backgroundColor: 'var(--status-error)',
+                  color: 'var(--bg-base)'
+                }}
               >
                 Retry
               </button>
@@ -266,7 +309,13 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
 
         {/* Panel Footer */}
         {explainStatus === 'done' && (
-          <div className="h-6 px-3 border-t border-[#1E1E2E] flex items-center justify-between text-[9px] text-slate-500 bg-[#0B0B11]">
+          <div 
+            className="h-6 px-3 flex items-center justify-between text-[9px] bg-[#111111]"
+            style={{ 
+              borderTop: '1px solid var(--border-subtle)',
+              color: 'var(--text-muted)'
+            }}
+          >
             <span>Generated by Claude</span>
             <span>{tokensUsed !== null ? `${tokensUsed} tokens` : ''} · Not a substitute for manual analysis</span>
           </div>
@@ -275,3 +324,5 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
     </div>
   );
 };
+
+export default CodeViewerPane;

@@ -55,12 +55,9 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
 
   // Stepper state calculator
   const getStepState = (step: 'import' | 'analyse' | 'decompile' | 'export') => {
-    // idle / error / uploading
     if (isIdle || isError || isUploading) return 'inactive';
-
     if (isDone) return 'completed';
 
-    // Map progress values to steps
     const progress = analysisProgress;
     if (step === 'import') {
       if (progress >= 15) return 'completed';
@@ -84,10 +81,23 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
     return 'inactive';
   };
 
-  const getStepClass = (state: 'inactive' | 'active' | 'completed') => {
-    if (state === 'completed') return 'bg-[#00FFC8]/10 border-[#00FFC8] text-[#00FFC8]';
-    if (state === 'active') return 'bg-[#FFB347]/10 border-[#FFB347] text-[#FFB347] animate-pulse';
-    return 'bg-[#1E1E2E] border-[#1E1E2E] text-slate-500';
+  const getStepStyle = (state: 'inactive' | 'active' | 'completed') => {
+    if (state === 'completed') {
+      return {
+        style: { backgroundColor: 'rgba(74, 222, 128, 0.05)', borderColor: 'var(--status-live)', color: 'var(--status-live)' },
+        class: ''
+      };
+    }
+    if (state === 'active') {
+      return {
+        style: { backgroundColor: 'rgba(232, 232, 232, 0.05)', borderColor: 'var(--accent)', color: 'var(--text-primary)' },
+        class: 'animate-pulse'
+      };
+    }
+    return {
+      style: { backgroundColor: 'var(--bg-inset)', borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' },
+      class: ''
+    };
   };
 
   const steps = [
@@ -98,18 +108,24 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
   ] as const;
 
   return (
-    <div className="bg-[#0A0A0F] border border-[#1E1E2E] rounded-lg p-5 flex flex-col space-y-5">
-      <div className="flex items-center justify-between border-b border-[#1E1E2E] pb-3">
+    <div 
+      className="rounded-lg p-5 flex flex-col space-y-4 bg-[#111111]"
+      style={{ border: '1px solid var(--border-subtle)' }}
+    >
+      <div 
+        className="flex items-center justify-between pb-3"
+        style={{ borderBottom: '1px solid var(--border-subtle)' }}
+      >
         <div className="flex items-center space-x-2">
-          <FileCode className="h-4 w-4 text-[#FFB347]" />
-          <h2 className="text-sm font-semibold tracking-wider uppercase text-slate-400">
+          <FileCode className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
+          <h2 className="text-xs font-semibold tracking-wider uppercase" style={{ color: 'var(--text-secondary)' }}>
             Decompiler Handoff
           </h2>
         </div>
         {isProcessing && (
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FFB347] opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FFB347]"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: 'var(--accent)' }}></span>
+            <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: 'var(--accent)' }}></span>
           </span>
         )}
       </div>
@@ -120,20 +136,22 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
           <button
             onClick={sendToServer}
             disabled={isDone}
-            className={`w-full h-10 flex items-center justify-center space-x-2 text-sm font-semibold rounded-md transition-colors ${
-              isDone
-                ? 'bg-[#00FFC8]/10 border border-[#00FFC8] text-[#00FFC8] cursor-default'
-                : 'bg-[#FFB347] text-[#0A0A0F] hover:bg-[#FFA330]'
-            }`}
+            className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded transition-all duration-150"
+            style={{
+              backgroundColor: isDone ? 'rgba(74, 222, 128, 0.05)' : 'var(--accent)',
+              border: isDone ? '1px solid var(--status-live)' : 'none',
+              color: isDone ? 'var(--status-live)' : 'var(--bg-base)',
+              cursor: isDone ? 'default' : 'pointer'
+            }}
           >
             {isDone ? (
               <>
-                <CheckCircle className="h-4 w-4" />
+                <CheckCircle className="h-3.5 w-3.5" />
                 <span>{getButtonLabel()}</span>
               </>
             ) : (
               <>
-                <Send className="h-4 w-4" />
+                <Send className="h-3.5 w-3.5" />
                 <span>{getButtonLabel()}</span>
               </>
             )}
@@ -141,9 +159,14 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
         ) : (
           <button
             onClick={cancelHandoff}
-            className="w-full h-10 flex items-center justify-center space-x-2 text-sm font-semibold rounded-md border border-[#FF4C4C] text-[#FF4C4C] hover:bg-[#FF4C4C]/10 transition-colors"
+            className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded transition-all duration-150"
+            style={{
+              border: '1px solid var(--status-error)',
+              color: 'var(--status-error)',
+              backgroundColor: 'rgba(248, 113, 113, 0.05)',
+            }}
           >
-            <Ban className="h-4 w-4" />
+            <Ban className="h-3.5 w-3.5" />
             <span>Cancel Handoff</span>
           </button>
         )}
@@ -151,14 +174,17 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
         {/* Upload progress state */}
         {isUploading && (
           <div className="space-y-1 pt-2">
-            <div className="flex justify-between text-[11px] font-sans text-slate-400">
-              <span>Uploading {formatSize(flashSize)}</span>
-              <span className="font-mono text-[#FFB347]">{uploadProgress}%</span>
+            <div className="flex justify-between text-[10px] font-sans">
+              <span style={{ color: 'var(--text-secondary)' }}>Uploading {formatSize(flashSize)}</span>
+              <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{uploadProgress}%</span>
             </div>
-            <div className="w-full h-1.5 bg-[#1E1E2E] rounded-full overflow-hidden">
+            <div className="w-full h-1.5 rounded overflow-hidden" style={{ backgroundColor: 'var(--bg-inset)' }}>
               <div
-                className="h-full bg-[#FFB347] transition-all duration-150"
-                style={{ width: `${uploadProgress}%` }}
+                className="h-full transition-all duration-150"
+                style={{ 
+                  width: `${uploadProgress}%`,
+                  backgroundColor: 'var(--accent)' 
+                }}
               ></div>
             </div>
           </div>
@@ -166,7 +192,14 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
 
         {/* Queued notification */}
         {isQueued && (
-          <div className="text-center p-3 border border-[#1E1E2E] bg-[#1E1E2E]/10 rounded-md text-xs text-slate-400 font-sans">
+          <div 
+            className="text-center p-3 rounded text-[11px] font-sans"
+            style={{ 
+              backgroundColor: 'var(--bg-inset)', 
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--text-secondary)'
+            }}
+          >
             Job accepted. Waiting for Ghidra worker thread allocation...
           </div>
         )}
@@ -175,16 +208,19 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
         {(isAnalyzing || isQueued) && (
           <div className="space-y-3 pt-1">
             <div className="space-y-1">
-              <div className="flex justify-between text-[11px] font-sans text-slate-400">
-                <span className="truncate max-w-[200px]" title={analysisStage}>
+              <div className="flex justify-between text-[10px] font-sans">
+                <span className="truncate max-w-[200px]" style={{ color: 'var(--text-secondary)' }} title={analysisStage}>
                   {analysisStage || 'Starting analysis...'}
                 </span>
-                <span className="font-mono text-[#00FFC8]">{analysisProgress}%</span>
+                <span className="font-mono font-medium" style={{ color: 'var(--text-primary)' }}>{analysisProgress}%</span>
               </div>
-              <div className="w-full h-1.5 bg-[#1E1E2E] rounded-full overflow-hidden">
+              <div className="w-full h-1.5 rounded overflow-hidden" style={{ backgroundColor: 'var(--bg-inset)' }}>
                 <div
-                  className="h-full bg-[#00FFC8] transition-all duration-200"
-                  style={{ width: `${analysisProgress}%` }}
+                  className="h-full transition-all duration-200"
+                  style={{ 
+                    width: `${analysisProgress}%`,
+                    backgroundColor: 'var(--accent)'
+                  }}
                 ></div>
               </div>
             </div>
@@ -193,16 +229,16 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
             <div className="grid grid-cols-4 gap-1 pt-2">
               {steps.map((step) => {
                 const state = getStepState(step.key);
+                const stepDetails = getStepStyle(state);
                 return (
                   <div key={step.key} className="flex flex-col items-center space-y-1">
                     <div
-                      className={`w-7 h-7 flex items-center justify-center rounded-full border text-[10px] font-mono font-semibold transition-all ${getStepClass(
-                        state
-                      )}`}
+                      className={`w-6 h-6 flex items-center justify-center rounded-full border text-[9px] font-mono font-semibold transition-all duration-150 ${stepDetails.class}`}
+                      style={stepDetails.style}
                     >
                       {state === 'completed' ? '✓' : step.label[0]}
                     </div>
-                    <span className="text-[9px] text-slate-500 font-sans">{step.label}</span>
+                    <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{step.label}</span>
                   </div>
                 );
               })}
@@ -212,34 +248,58 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
 
         {/* Error notifications */}
         {isError && errorMessage && (
-          <div className="bg-[#FF4C4C]/10 border border-[#FF4C4C] rounded-lg p-4 flex items-start space-x-3 text-slate-200">
-            <AlertCircle className="h-4 w-4 text-[#FF4C4C] shrink-0 mt-0.5" />
+          <div 
+            className="rounded p-3 flex items-start space-x-3 text-xs"
+            style={{ 
+              backgroundColor: 'rgba(248, 113, 113, 0.05)', 
+              border: '1px solid var(--status-error)' 
+            }}
+          >
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" style={{ color: 'var(--status-error)' }} />
             <div>
-              <h3 className="text-xs font-semibold text-[#FF4C4C]">Decompiler Error</h3>
-              <p className="text-[10px] text-slate-300 mt-1">{errorMessage}</p>
+              <h3 className="font-semibold" style={{ color: 'var(--status-error)' }}>Decompiler Error</h3>
+              <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>{errorMessage}</p>
             </div>
           </div>
         )}
 
         {/* Result Summary Cards */}
         {isDone && result && (
-          <div className="space-y-4 pt-2 border-t border-[#1E1E2E]">
+          <div className="space-y-4 pt-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
             <div className="grid grid-cols-3 gap-2">
-              <div className="bg-[#1E1E2E]/20 border border-[#1E1E2E] p-2.5 rounded text-center">
-                <span className="block text-[9px] text-slate-500 uppercase tracking-wide">Functions</span>
-                <span className="font-mono text-sm font-semibold text-[#00FFC8]">
+              <div 
+                className="p-2 rounded text-center"
+                style={{ 
+                  backgroundColor: 'var(--bg-inset)',
+                  border: '1px solid var(--border-subtle)'
+                }}
+              >
+                <span className="block text-[8px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Functions</span>
+                <span className="font-mono text-xs font-semibold" style={{ color: 'var(--status-live)' }}>
                   {result.functions?.length || 0}
                 </span>
               </div>
-              <div className="bg-[#1E1E2E]/20 border border-[#1E1E2E] p-2.5 rounded text-center">
-                <span className="block text-[9px] text-slate-500 uppercase tracking-wide">Strings</span>
-                <span className="font-mono text-sm font-semibold text-[#FFB347]">
+              <div 
+                className="p-2 rounded text-center"
+                style={{ 
+                  backgroundColor: 'var(--bg-inset)',
+                  border: '1px solid var(--border-subtle)'
+                }}
+              >
+                <span className="block text-[8px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Strings</span>
+                <span className="font-mono text-xs font-semibold animate-pulse" style={{ color: 'var(--accent)' }}>
                   {result.strings?.length || 0}
                 </span>
               </div>
-              <div className="bg-[#1E1E2E]/20 border border-[#1E1E2E] p-2.5 rounded text-center">
-                <span className="block text-[9px] text-slate-500 uppercase tracking-wide">Entry Point</span>
-                <span className="font-mono text-[10px] font-semibold text-slate-200 truncate block">
+              <div 
+                className="p-2 rounded text-center"
+                style={{ 
+                  backgroundColor: 'var(--bg-inset)',
+                  border: '1px solid var(--border-subtle)'
+                }}
+              >
+                <span className="block text-[8px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Entry Point</span>
+                <span className="font-mono text-[9px] font-semibold truncate block" style={{ color: 'var(--text-primary)' }}>
                   {result.entry_point || '—'}
                 </span>
               </div>
@@ -250,14 +310,15 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
               onClick={() => {
                 if (onOpenExplorer) {
                   onOpenExplorer();
-                } else {
-                  console.log('PHASE 4: Launching Code Explorer with result:', result);
-                  alert('Phase 3 complete! Reconstructed pseudo-C is now cached in memory for Phase 4 Code Explorer.');
                 }
               }}
-              className="w-full h-10 flex items-center justify-center space-x-2 text-sm font-semibold rounded-md bg-[#00FFC8] text-[#0A0A0F] hover:bg-[#00E0B0] transition-colors"
+              className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded hover:opacity-90 transition-all duration-150"
+              style={{
+                backgroundColor: 'var(--status-live)',
+                color: 'var(--bg-base)',
+              }}
             >
-              <Play className="h-4 w-4" />
+              <Play className="h-3.5 w-3.5" />
               <span>View in Code Explorer</span>
             </button>
           </div>
@@ -266,3 +327,5 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
     </div>
   );
 };
+
+export default HandoffPanel;

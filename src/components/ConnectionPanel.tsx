@@ -47,18 +47,18 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   isBrowserSupported = true,
 }) => {
   
-  // Map connection states to readable labels and dot color classes
+  // Map connection states to readable labels and dot color tokens
   const getStatusDetails = () => {
     switch (connectionStatus) {
       case 'connected':
-        return { label: 'Live', dotClass: 'bg-[#00FFC8] shadow-[0_0_8px_#00FFC8]' };
+        return { label: 'Live', color: 'var(--status-live)' };
       case 'connecting':
-        return { label: 'Connecting', dotClass: 'bg-[#FFB347] shadow-[0_0_8px_#FFB347]' };
+        return { label: 'Connecting', color: 'var(--status-warn)' };
       case 'error':
-        return { label: 'Connection Error', dotClass: 'bg-[#FF4C4C] shadow-[0_0_8px_#FF4C4C]' };
+        return { label: 'Connection Error', color: 'var(--status-error)' };
       case 'idle':
       default:
-        return { label: 'Disconnected', dotClass: 'bg-[#FF4C4C] shadow-[0_0_8px_#FF4C4C]' };
+        return { label: 'Disconnected', color: 'var(--text-muted)' };
     }
   };
 
@@ -67,30 +67,45 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   const isConnected = connectionStatus === 'connected';
 
   return (
-    <div className="flex flex-col space-y-6">
-      <div className="bg-[#0A0A0F] border border-[#1E1E2E] rounded-lg p-5 flex flex-col space-y-5">
-        <div className="flex items-center justify-between border-b border-[#1E1E2E] pb-3">
-          <h2 className="text-sm font-semibold tracking-wider uppercase text-slate-400">
+    <div className="flex flex-col space-y-4">
+      <div 
+        className="rounded-lg p-5 flex flex-col space-y-4 bg-[#111111]"
+        style={{ border: '1px solid var(--border-subtle)' }}
+      >
+        <div 
+          className="flex items-center justify-between pb-3"
+          style={{ borderBottom: '1px solid var(--border-subtle)' }}
+        >
+          <h2 className="text-xs font-semibold tracking-wider uppercase" style={{ color: 'var(--text-secondary)' }}>
             Hardware Control
           </h2>
           <div className="flex items-center space-x-2">
             {/* Status Indicator Dot */}
-            <span className={`relative flex h-2.5 w-2.5`}>
-              {connectionStatus !== 'idle' && (
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${status.dotClass}`}></span>
+            <span className="relative flex h-2 w-2">
+              {connectionStatus !== 'idle' && connectionStatus !== 'error' && (
+                <span 
+                  className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                  style={{ backgroundColor: status.color }}
+                />
               )}
-              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${status.dotClass}`}></span>
+              <span 
+                className="relative inline-flex rounded-full h-2 w-2"
+                style={{ 
+                  backgroundColor: status.color,
+                  boxShadow: isConnected ? `0 0 6px ${status.color}` : 'none'
+                }}
+              />
             </span>
-            <span className="text-xs font-medium font-sans text-slate-300">
+            <span className="text-xs font-medium font-sans text-[#F0F0F0]">
               {status.label}
             </span>
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3.5">
           {/* Architecture Selector */}
           <div className="flex flex-col space-y-1.5">
-            <label htmlFor="arch-select" className="text-xs font-medium text-slate-400">
+            <label htmlFor="arch-select" className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
               Microcontroller Architecture
             </label>
             <select
@@ -98,7 +113,11 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
               value={selectedArch}
               onChange={(e) => setSelectedArch(e.target.value)}
               disabled={isConnected || isConnecting}
-              className="w-full h-10 px-3 py-2 bg-[#0A0A0F] border border-[#1E1E2E] rounded-md text-[13px] font-sans text-slate-200 focus:outline-none focus:border-[#00FFC8] focus:ring-1 focus:ring-[#00FFC8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full h-9 px-3 py-1.5 rounded text-xs font-sans text-[#F0F0F0] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 focus:outline-none"
+              style={{
+                backgroundColor: 'var(--bg-inset)',
+                border: '1px solid var(--border-default)',
+              }}
             >
               <option value="esp32">ESP32 (WROOM / WROVER)</option>
               <option value="esp8266">ESP8266 (EX / NodeMCU)</option>
@@ -110,7 +129,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
 
           {/* Baud Rate Selector */}
           <div className="flex flex-col space-y-1.5">
-            <label htmlFor="baud-select" className="text-xs font-medium text-slate-400">
+            <label htmlFor="baud-select" className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
               Baud Rate (bps)
             </label>
             <select
@@ -118,7 +137,11 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
               value={selectedBaud}
               onChange={(e) => setSelectedBaud(Number(e.target.value))}
               disabled={isConnected || isConnecting}
-              className="w-full h-10 px-3 py-2 bg-[#0A0A0F] border border-[#1E1E2E] rounded-md text-[13px] font-sans text-slate-200 focus:outline-none focus:border-[#00FFC8] focus:ring-1 focus:ring-[#00FFC8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full h-9 px-3 py-1.5 rounded text-xs font-sans text-[#F0F0F0] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 focus:outline-none"
+              style={{
+                backgroundColor: 'var(--bg-inset)',
+                border: '1px solid var(--border-default)',
+              }}
             >
               <option value="9600">9600 bps</option>
               <option value="57600">57600 bps</option>
@@ -134,25 +157,34 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
           {isConnected ? (
             <button
               onClick={() => disconnect()}
-              className="w-full h-10 flex items-center justify-center space-x-2 text-sm font-semibold rounded-md border border-[#FF4C4C] text-[#FF4C4C] hover:bg-[#FF4C4C]/10 transition-colors"
+              className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded transition-all duration-150 hover:opacity-90"
+              style={{
+                border: '1px solid var(--status-error)',
+                color: 'var(--status-error)',
+                backgroundColor: 'rgba(248, 113, 113, 0.05)',
+              }}
             >
-              <Square className="h-4 w-4" />
+              <Square className="h-3.5 w-3.5" />
               <span>Disconnect Link</span>
             </button>
           ) : (
             <button
               onClick={connect}
               disabled={isConnecting}
-              className="w-full h-10 flex items-center justify-center space-x-2 text-sm font-semibold rounded-md bg-[#00FFC8] text-[#0A0A0F] hover:bg-[#00E0B0] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150"
+              style={{
+                backgroundColor: 'var(--accent)',
+                color: 'var(--bg-base)',
+              }}
             >
               {isConnecting ? (
                 <>
-                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                   <span>Establishing Bridge...</span>
                 </>
               ) : (
                 <>
-                  <Play className="h-4 w-4" />
+                  <Play className="h-3.5 w-3.5" />
                   <span>Establish Bridge</span>
                 </>
               )}
@@ -179,3 +211,5 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
     </div>
   );
 };
+
+export default ConnectionPanel;

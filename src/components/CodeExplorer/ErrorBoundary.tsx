@@ -35,19 +35,35 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="fixed inset-0 z-50 bg-[#0A0A0F] text-[#E2E8F0] flex flex-col items-center justify-center p-6 font-sans select-none">
-          <div className="max-w-md w-full bg-[#12121A] border border-[#FF4C4C]/30 rounded-lg p-6 flex flex-col space-y-4 shadow-2xl">
+        <div 
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center p-6 font-sans select-none backdrop-blur-sm"
+          style={{ backgroundColor: 'rgba(8, 8, 8, 0.8)' }}
+        >
+          <div 
+            className="max-w-md w-full rounded-lg p-6 flex flex-col space-y-4 shadow-2xl"
+            style={{ 
+              backgroundColor: 'var(--bg-surface)', 
+              border: '1px solid var(--border-strong)' 
+            }}
+          >
             <div className="flex items-center space-x-2">
-              <span className="text-[#FF4C4C] font-bold text-lg uppercase tracking-widest">Binino</span>
-              <span className="text-slate-500">/</span>
-              <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider">Crash Diagnostic</span>
+              <span className="font-bold text-lg uppercase tracking-widest" style={{ color: 'var(--status-error)' }}>Binino</span>
+              <span style={{ color: 'var(--text-muted)' }}>/</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--status-error)' }}>Crash Diagnostic</span>
             </div>
             
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
               The Code Explorer encountered a critical runtime exception and had to terminate the layout process. Exception message logged below:
             </p>
             
-            <div className="bg-[#0A0A0F] border border-[#1E1E2E] p-3 rounded font-mono text-[10px] text-red-400 overflow-x-auto whitespace-pre-wrap max-h-32 select-text">
+            <div 
+              className="p-3 rounded font-mono text-[10px] overflow-x-auto whitespace-pre-wrap max-h-32 select-text"
+              style={{
+                backgroundColor: 'var(--bg-inset)',
+                border: '1px solid var(--border-subtle)',
+                color: 'var(--status-error)'
+              }}
+            >
               {this.state.error?.toString()}
             </div>
             
@@ -57,7 +73,11 @@ export class ErrorBoundary extends Component<Props, State> {
                   this.props.onClose();
                 }
               }}
-              className="h-10 w-full flex items-center justify-center text-sm font-semibold rounded-md bg-[#FF4C4C] text-white hover:bg-red-600 transition-colors"
+              className="h-9 w-full flex items-center justify-center text-xs font-semibold rounded transition-colors"
+              style={{
+                backgroundColor: 'var(--status-error)',
+                color: 'var(--bg-base)'
+              }}
             >
               Close Explorer
             </button>
@@ -96,15 +116,28 @@ export class HexDumpErrorBoundary extends Component<HexDumpProps, HexDumpState> 
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-[#0A0A0F] border-l border-[#1E1E2E] p-6 text-center select-none">
-          <svg className="w-8 h-8 text-[#FFB347] mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <div 
+          className="w-full h-full flex flex-col items-center justify-center p-6 text-center select-none"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderLeft: '1px solid var(--border-subtle)'
+          }}
+        >
+          <svg className="w-8 h-8 mb-2" style={{ color: 'var(--status-warn)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
-          <span className="text-[#FFB347] text-xs font-bold mb-1">Hex View Failure</span>
-          <span className="text-[10px] text-slate-500 max-w-[180px] mb-3 leading-relaxed">
+          <span className="text-xs font-bold mb-1" style={{ color: 'var(--status-warn)' }}>Hex View Failure</span>
+          <span className="text-[10px] max-w-[180px] mb-3 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
             An error occurred while virtualizing the memory flash dump view.
           </span>
-          <pre className="text-[9px] font-mono text-red-400 bg-[#12121A] px-2 py-1 rounded border border-[#1E1E2E] overflow-x-auto max-w-full select-text">
+          <pre 
+            className="text-[9px] font-mono px-2 py-1 rounded overflow-x-auto max-w-full select-text"
+            style={{
+              backgroundColor: 'var(--bg-inset)',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--status-error)'
+            }}
+          >
             {this.state.error?.message}
           </pre>
         </div>

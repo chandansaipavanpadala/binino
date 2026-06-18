@@ -32,36 +32,42 @@ export const DeviceInfoCard: React.FC<DeviceInfoCardProps> = ({
   };
 
   return (
-    <div className="bg-[#0A0A0F] border border-[#1E1E2E] rounded-lg p-5 flex flex-col space-y-4">
-      <div className="flex items-center space-x-2 border-b border-[#1E1E2E] pb-3">
-        <Info className="h-4 w-4 text-[#00FFC8]" />
-        <h2 className="text-sm font-semibold tracking-wider uppercase text-slate-400">
+    <div 
+      className="rounded-lg p-5 flex flex-col space-y-4 bg-[#111111]"
+      style={{ border: '1px solid var(--border-subtle)' }}
+    >
+      <div 
+        className="flex items-center space-x-2 pb-3"
+        style={{ borderBottom: '1px solid var(--border-subtle)' }}
+      >
+        <Info className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
+        <h2 className="text-xs font-semibold tracking-wider uppercase" style={{ color: 'var(--text-secondary)' }}>
           Device Metadata
         </h2>
       </div>
 
       <div className="grid grid-cols-2 gap-4 text-xs font-sans">
         <div>
-          <span className="block text-slate-500 mb-0.5">Port Name</span>
-          <span className="font-mono text-slate-200 block truncate" title={isConnected && portInfo ? portInfo.displayName : ''}>
+          <span className="block mb-0.5 text-[10px] uppercase tracking-wider font-mono" style={{ color: 'var(--text-muted)' }}>Port Name</span>
+          <span className="font-mono block truncate" style={{ color: 'var(--text-primary)' }} title={isConnected && portInfo ? portInfo.displayName : ''}>
             {isConnected && portInfo ? portInfo.displayName : '—'}
           </span>
         </div>
         <div>
-          <span className="block text-slate-500 mb-0.5">Architecture</span>
-          <span className="font-medium text-slate-200 block">
+          <span className="block mb-0.5 text-[10px] uppercase tracking-wider font-mono" style={{ color: 'var(--text-muted)' }}>Architecture</span>
+          <span className="font-medium block" style={{ color: 'var(--text-primary)' }}>
             {isConnected ? getArchLabel(selectedArch) : '—'}
           </span>
         </div>
         <div>
-          <span className="block text-slate-500 mb-0.5">Baud Rate</span>
-          <span className="font-mono text-slate-200 block">
+          <span className="block mb-0.5 text-[10px] uppercase tracking-wider font-mono" style={{ color: 'var(--text-muted)' }}>Baud Rate</span>
+          <span className="font-mono block" style={{ color: 'var(--text-primary)' }}>
             {isConnected ? `${selectedBaud} bps` : '—'}
           </span>
         </div>
         <div>
-          <span className="block text-slate-500 mb-0.5">Bridge Time</span>
-          <span className="font-mono text-slate-200 block">
+          <span className="block mb-0.5 text-[10px] uppercase tracking-wider font-mono" style={{ color: 'var(--text-muted)' }}>Bridge Time</span>
+          <span className="font-mono block" style={{ color: 'var(--text-primary)' }}>
             {isConnected && connectionTimestamp ? connectionTimestamp : '—'}
           </span>
         </div>
@@ -69,3 +75,5 @@ export const DeviceInfoCard: React.FC<DeviceInfoCardProps> = ({
     </div>
   );
 };
+
+export default DeviceInfoCard;

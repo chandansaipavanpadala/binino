@@ -3,7 +3,6 @@ import { ExtractionStatus } from '../hooks/useFlashExtractor';
 import { ConnectionStatus } from '../hooks/useSerialPort';
 import { Download, Cpu, XCircle } from 'lucide-react';
 
-
 interface ExtractionPanelProps {
   connectionStatus: ConnectionStatus;
   selectedArch: string;
@@ -102,40 +101,69 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
   const getBadgeDetails = () => {
     switch (extractionStatus) {
       case 'syncing':
-        return { label: 'Syncing', bg: 'bg-[#FFB347]/10 border-[#FFB347] text-[#FFB347] animate-pulse' };
+        return { 
+          label: 'Syncing', 
+          style: { backgroundColor: 'rgba(245, 158, 11, 0.05)', borderColor: 'var(--status-warn)', color: 'var(--status-warn)' },
+          class: 'animate-pulse'
+        };
       case 'reading':
-        return { label: 'Reading ROM', bg: 'bg-[#00FFC8]/10 border-[#00FFC8] text-[#00FFC8] animate-pulse' };
+        return { 
+          label: 'Reading ROM', 
+          style: { backgroundColor: 'rgba(232, 232, 232, 0.05)', borderColor: 'var(--accent)', color: 'var(--text-primary)' },
+          class: 'animate-pulse'
+        };
       case 'done':
-        return { label: 'Dump Success', bg: 'bg-[#00FFC8]/10 border-[#00FFC8] text-[#00FFC8]' };
+        return { 
+          label: 'Dump Success', 
+          style: { backgroundColor: 'rgba(74, 222, 128, 0.05)', borderColor: 'var(--status-live)', color: 'var(--status-live)' },
+          class: ''
+        };
       case 'error':
-        return { label: 'Dump Failed', bg: 'bg-[#FF4C4C]/10 border-[#FF4C4C] text-[#FF4C4C]' };
+        return { 
+          label: 'Dump Failed', 
+          style: { backgroundColor: 'rgba(248, 113, 113, 0.05)', borderColor: 'var(--status-error)', color: 'var(--status-error)' },
+          class: ''
+        };
       case 'idle':
       default:
-        return { label: 'Idle', bg: 'bg-slate-800/40 border-slate-700 text-slate-400' };
+        return { 
+          label: 'Idle', 
+          style: { backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' },
+          class: ''
+        };
     }
   };
 
   const badge = getBadgeDetails();
 
   return (
-    <div className="bg-[#0A0A0F] border border-[#1E1E2E] rounded-lg p-5 flex flex-col space-y-5">
-      <div className="flex items-center justify-between border-b border-[#1E1E2E] pb-3">
+    <div 
+      className="rounded-lg p-5 flex flex-col space-y-4 bg-[#111111]"
+      style={{ border: '1px solid var(--border-subtle)' }}
+    >
+      <div 
+        className="flex items-center justify-between pb-3"
+        style={{ borderBottom: '1px solid var(--border-subtle)' }}
+      >
         <div className="flex items-center space-x-2">
-          <Cpu className="h-4 w-4 text-[#00FFC8]" />
-          <h2 className="text-sm font-semibold tracking-wider uppercase text-slate-400">
+          <Cpu className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
+          <h2 className="text-xs font-semibold tracking-wider uppercase" style={{ color: 'var(--text-secondary)' }}>
             Flash Extractor
           </h2>
         </div>
         
         {/* Status Badge */}
-        <span className={`px-2 py-0.5 text-[10px] font-sans font-medium uppercase tracking-wider rounded border ${badge.bg}`}>
+        <span 
+          className={`px-2 py-0.5 text-[9px] font-mono font-medium uppercase tracking-wider rounded border ${badge.class}`}
+          style={badge.style}
+        >
           {badge.label}
         </span>
       </div>
 
       {/* Select Flash size */}
       <div className="flex flex-col space-y-1.5">
-        <label htmlFor="flash-size" className="text-xs font-medium text-slate-400">
+        <label htmlFor="flash-size" className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
           Target Flash Memory Size
         </label>
         <select
@@ -143,7 +171,11 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
           value={selectedSize}
           onChange={(e) => setSelectedSize(Number(e.target.value))}
           disabled={isRunning}
-          className="w-full h-10 px-3 py-2 bg-[#0A0A0F] border border-[#1E1E2E] rounded-md text-[13px] font-sans text-slate-200 focus:outline-none focus:border-[#00FFC8] focus:ring-1 focus:ring-[#00FFC8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full h-9 px-3 py-1.5 rounded text-xs font-sans text-[#F0F0F0] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 focus:outline-none"
+          style={{
+            backgroundColor: 'var(--bg-inset)',
+            border: '1px solid var(--border-default)',
+          }}
         >
           {sizeOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -163,18 +195,28 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
             <button
               onClick={() => startExtraction(selectedArch, selectedSize)}
               disabled={isExtractDisabled}
-              className="w-full h-10 flex items-center justify-center space-x-2 text-sm font-semibold rounded-md bg-[#00FFC8] text-[#0A0A0F] hover:bg-[#00E0B0] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 active:scale-[0.98] focus-visible:ring-1 focus-visible:ring-[#00FFC8] focus-visible:outline-none"
+              className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: isExtractDisabled ? 'var(--bg-elevated)' : 'var(--accent)',
+                color: isExtractDisabled ? 'var(--text-muted)' : 'var(--bg-base)',
+                border: isExtractDisabled ? '1px solid var(--border-subtle)' : 'none',
+              }}
             >
-              <Download className="h-4 w-4" />
+              <Download className="h-3.5 w-3.5" />
               <span>Extract Firmware</span>
             </button>
           </div>
         ) : (
           <button
             onClick={cancelExtraction}
-            className="w-full h-10 flex items-center justify-center space-x-2 text-sm font-semibold rounded-md border border-[#FF4C4C] text-[#FF4C4C] hover:bg-[#FF4C4C]/10 transition-colors"
+            className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded transition-all duration-150"
+            style={{
+              border: '1px solid var(--status-error)',
+              color: 'var(--status-error)',
+              backgroundColor: 'rgba(248, 113, 113, 0.05)',
+            }}
           >
-            <XCircle className="h-4 w-4" />
+            <XCircle className="h-3.5 w-3.5" />
             <span>Cancel Extraction</span>
           </button>
         )}
@@ -183,9 +225,13 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
         {extractionStatus === 'done' && (
           <button
             onClick={downloadBin}
-            className="w-full h-10 flex items-center justify-center space-x-2 text-sm font-semibold rounded-md bg-[#FFB347] text-[#0A0A0F] hover:bg-[#FFA330] transition-colors"
+            className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded transition-all duration-150 hover:opacity-90"
+            style={{
+              backgroundColor: 'var(--status-live)',
+              color: 'var(--bg-base)',
+            }}
           >
-            <Download className="h-4 w-4" />
+            <Download className="h-3.5 w-3.5" />
             <span>Download binino_image.bin</span>
           </button>
         )}
@@ -194,9 +240,14 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
         {extractionStatus === 'error' && flashBuffer && bytesRead > 0 && (
           <button
             onClick={downloadBin}
-            className="w-full h-10 flex items-center justify-center space-x-2 text-sm font-semibold rounded-md border border-[#FFB347] text-[#FFB347] hover:bg-[#FFB347]/10 transition-colors"
+            className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded transition-all duration-150 hover:opacity-90"
+            style={{
+              border: '1px solid var(--status-warn)',
+              color: 'var(--status-warn)',
+              backgroundColor: 'rgba(245, 158, 11, 0.05)',
+            }}
           >
-            <Download className="h-4 w-4" />
+            <Download className="h-3.5 w-3.5" />
             <span>Download Partial Backup ({Math.round(bytesRead / 1024)}KB)</span>
           </button>
         )}
@@ -204,38 +255,41 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
 
       {/* Progress Bar Indicators */}
       {isRunning && (
-        <div className="space-y-3 pt-2">
+        <div className="space-y-3 pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
           {/* Progress fill */}
           <div className="space-y-1">
-            <div className="flex justify-between text-[11px] font-sans text-slate-400">
-              <span>Progress</span>
-              <span className="font-mono text-[#00FFC8]">{progressPercent}%</span>
+            <div className="flex justify-between text-[10px] font-sans">
+              <span style={{ color: 'var(--text-secondary)' }}>Progress</span>
+              <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{progressPercent}%</span>
             </div>
-            <div className="w-full h-2 bg-[#1E1E2E] rounded-full overflow-hidden">
+            <div className="w-full h-1.5 rounded overflow-hidden" style={{ backgroundColor: 'var(--bg-inset)' }}>
               <div
-                className="h-full bg-[#00FFC8] transition-all duration-150"
-                style={{ width: `${progressPercent}%` }}
+                className="h-full transition-all duration-150"
+                style={{ 
+                  width: `${progressPercent}%`,
+                  backgroundColor: 'var(--accent)',
+                }}
               ></div>
             </div>
           </div>
 
           {/* Transfer stats */}
-          <div className="grid grid-cols-3 gap-2 border-t border-[#1E1E2E] pt-3 text-[10px] text-slate-400 font-sans">
+          <div className="grid grid-cols-3 gap-2 text-[9px] font-mono">
             <div>
-              <span className="block text-slate-500 mb-0.5">Retrieved</span>
-              <span className="font-mono text-slate-200 block truncate">
+              <span className="block text-[8px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Retrieved</span>
+              <span className="block truncate" style={{ color: 'var(--text-primary)' }}>
                 {Math.round(bytesRead / 1024)} KB
               </span>
             </div>
             <div>
-              <span className="block text-slate-500 mb-0.5">Throughput</span>
-              <span className="font-mono text-slate-200 block truncate">
+              <span className="block text-[8px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Throughput</span>
+              <span className="block truncate" style={{ color: 'var(--text-primary)' }}>
                 {extractionStatus === 'reading' ? formatSpeed(speed) : 'Waiting'}
               </span>
             </div>
             <div>
-              <span className="block text-slate-500 mb-0.5">ETA</span>
-              <span className="font-mono text-slate-200 block truncate">
+              <span className="block text-[8px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>ETA</span>
+              <span className="block truncate" style={{ color: 'var(--text-primary)' }}>
                 {extractionStatus === 'reading' ? formatEta(eta) : 'Estimating'}
               </span>
             </div>
@@ -245,3 +299,5 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
     </div>
   );
 };
+
+export default ExtractionPanel;

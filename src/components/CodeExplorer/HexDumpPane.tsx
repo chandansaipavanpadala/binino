@@ -77,7 +77,7 @@ export const HexDumpPane: React.FC<HexDumpPaneProps> = ({
   const bufferLength = activeBuffer.length;
   const totalRows = Math.ceil(bufferLength / 16);
 
-  // PERF: row height is fixed at 22px. Change ROW_HEIGHT constant here for Phase 5 font adjustments.
+  // PERF: row height is fixed at 22px.
   const ROW_HEIGHT = 22;
   const OVERSCAN = 10;
   const totalHeight = totalRows * ROW_HEIGHT;
@@ -226,12 +226,18 @@ export const HexDumpPane: React.FC<HexDumpPaneProps> = ({
 
   if (!isDemoMode && !flashBuffer) {
     return (
-      <div className="flex flex-col h-full bg-[#0A0A0F] border-l border-[#1E1E2E] w-full items-center justify-center text-center p-6 space-y-3 select-text min-w-[250px]">
+      <div 
+        className="flex flex-col h-full w-full items-center justify-center text-center p-6 space-y-3 select-text min-w-[250px]"
+        style={{
+          backgroundColor: 'var(--bg-surface)',
+          borderLeft: '1px solid var(--border-subtle)'
+        }}
+      >
         <svg className="w-8 h-8 text-slate-600 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
         </svg>
-        <span className="text-slate-400 text-xs font-semibold">Hex Dump Unavailable</span>
-        <p className="text-[11px] text-slate-500 max-w-[200px] leading-relaxed">
+        <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Hex Dump Unavailable</span>
+        <p className="text-[10px] max-w-[200px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           Raw flash buffer unavailable. Re-run extraction to enable hex view.
         </p>
       </div>
@@ -239,9 +245,15 @@ export const HexDumpPane: React.FC<HexDumpPaneProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#0A0A0F] border-l border-[#1E1E2E] w-[30%] select-none min-w-[250px]">
+    <div 
+      className="flex flex-col h-full select-none min-w-[250px] w-full"
+      style={{
+        backgroundColor: 'var(--bg-surface)',
+        borderLeft: '1px solid var(--border-subtle)',
+      }}
+    >
       {/* Top toolbar with jump action */}
-      <div className="p-3 border-b border-[#1E1E2E] flex flex-col gap-1.5 flex-shrink-0">
+      <div className="p-3 flex flex-col gap-1.5 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
         <form onSubmit={handleJumpSubmit} className="flex gap-2 relative">
           <input
             type="text"
@@ -251,54 +263,71 @@ export const HexDumpPane: React.FC<HexDumpPaneProps> = ({
               setJumpError(null);
             }}
             placeholder="Jump to address (e.g. 0x40081200)..."
-            className={`flex-1 h-8 px-2 bg-[#12121A] text-xs text-white rounded border focus:outline-none focus:border-[#00FFC8] transition-colors ${
-              jumpError ? 'border-red-500 focus:border-red-500' : 'border-[#232334]'
-            }`}
+            className="flex-1 h-8 px-2 text-xs text-[#F0F0F0] rounded focus:outline-none transition-colors"
+            style={{
+              backgroundColor: 'var(--bg-inset)',
+              border: jumpError ? '1px solid var(--status-error)' : '1px solid var(--border-default)',
+            }}
           />
           <button
             type="submit"
-            className="h-8 px-3 bg-[#1A1A2E] hover:bg-[#1E1E38] border border-[#2D2D44] text-xs text-[#00FFC8] font-semibold rounded transition-colors"
+            className="h-8 px-3 text-xs font-semibold rounded transition-colors"
+            style={{
+              backgroundColor: 'var(--bg-inset)',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--accent)'
+            }}
           >
             Go
           </button>
         </form>
         {jumpError && (
-          <span className="text-[10px] text-red-400 pl-1">{jumpError}</span>
+          <span className="text-[9px] pl-1" style={{ color: 'var(--status-error)' }}>{jumpError}</span>
         )}
       </div>
 
       {/* Hex grid labels */}
-      <div className="px-4 py-1.5 bg-[#0D0D15] text-[9px] font-bold text-[#4A5568] tracking-widest font-mono flex border-b border-[#1E1E2E] flex-shrink-0">
+      <div 
+        className="px-4 py-1.5 text-[8px] font-bold tracking-widest font-mono flex flex-shrink-0"
+        style={{
+          backgroundColor: 'var(--bg-inset)',
+          borderBottom: '1px solid var(--border-subtle)',
+          color: 'var(--text-muted)'
+        }}
+      >
         <div className="w-[72px]">ADDRESS</div>
         <div className="flex-1 flex justify-around pl-4 max-w-[290px]">
           <span>00</span><span>01</span><span>02</span><span>03</span><span>04</span><span>05</span><span>06</span><span>07</span>
           <span className="w-1"></span>
           <span>08</span><span>09</span><span>0a</span><span>0b</span><span>0c</span><span>0d</span><span>0e</span><span>0f</span>
         </div>
-        <div className="w-20 text-center border-l border-[#1E1E2E] ml-2">ASCII</div>
+        <div className="w-20 text-center ml-2" style={{ borderLeft: '1px solid var(--border-subtle)' }}>ASCII</div>
       </div>
 
       {/* Scroller viewport */}
       <div
-        className="flex-1 overflow-y-auto relative font-mono text-[11px]"
+        className="flex-1 overflow-y-auto relative font-mono text-[10px]"
         ref={containerRef}
         onScroll={handleScroll}
       >
         {/* Absolute Floating Byte Tooltip */}
         {tooltip.visible && (
           <div
-            className="absolute z-50 bg-[#12121B] border border-[#2B2B3C] rounded shadow-2xl p-2 text-[9px] text-[#A0AEC0] flex flex-col gap-0.5 select-text pointer-events-none"
+            className="absolute z-50 rounded shadow-2xl p-2 text-[9px] flex flex-col gap-0.5 select-text pointer-events-none"
             style={{
               left: `${tooltip.x}px`,
               top: `${tooltip.y}px`,
               transform: 'translateX(-50%)',
+              backgroundColor: 'var(--bg-surface)',
+              border: '1px solid var(--border-strong)',
+              color: 'var(--text-secondary)'
             }}
           >
-            <div className="font-bold text-[#00FFC8]">{tooltip.address}</div>
+            <div className="font-bold" style={{ color: 'var(--accent)' }}>{tooltip.address}</div>
             <div className="flex justify-between gap-4">
-              <span>Dec: <strong className="text-white">{tooltip.dec}</strong></span>
-              <span>Bin: <strong className="text-white">{tooltip.bin}</strong></span>
-              <span>Char: <strong className="text-white">{tooltip.ascii}</strong></span>
+              <span>Dec: <strong style={{ color: 'var(--text-primary)' }}>{tooltip.dec}</strong></span>
+              <span>Bin: <strong style={{ color: 'var(--text-primary)' }}>{tooltip.bin}</strong></span>
+              <span>Char: <strong style={{ color: 'var(--text-primary)' }}>{tooltip.ascii}</strong></span>
             </div>
           </div>
         )}
@@ -310,15 +339,15 @@ export const HexDumpPane: React.FC<HexDumpPaneProps> = ({
             return (
               <div
                 key={row.offset}
-                className={`absolute left-0 right-0 h-[22px] flex items-center px-4 hover:bg-[#12121A]/30 border-l-2 transition-colors ${
-                  row.isHighlighted
-                    ? 'border-l-[#00FFC8] bg-[#00FFC8]/5'
-                    : 'border-l-transparent'
-                }`}
-                style={{ top: `${row.top}px` }}
+                className="absolute left-0 right-0 h-[22px] flex items-center px-4 hover:bg-[#1A1A1A] border-l-2 transition-colors"
+                style={{ 
+                  top: `${row.top}px`,
+                  borderLeftColor: row.isHighlighted ? 'var(--accent)' : 'transparent',
+                  backgroundColor: row.isHighlighted ? 'rgba(255, 255, 255, 0.02)' : 'transparent'
+                }}
               >
                 {/* Address block */}
-                <div className="w-[72px] text-[#4FD1C5]/70 font-semibold select-none">
+                <div className="w-[72px] font-semibold select-none" style={{ color: 'var(--text-secondary)' }}>
                   {rowAddrHex}
                 </div>
 
@@ -338,11 +367,12 @@ export const HexDumpPane: React.FC<HexDumpPaneProps> = ({
                       <React.Fragment key={byteIdx}>
                         {byteIdx === 8 && <span className="w-1 select-none"></span>}
                         <span
-                          className={`w-5 text-center cursor-help rounded transition-colors ${
-                            isHighlighted
-                              ? 'text-[#00FFC8] font-bold bg-[#00FFC8]/10'
-                              : 'text-[#A0AEC0] hover:bg-[#00FFC8] hover:text-black'
-                          }`}
+                          className="w-5 text-center cursor-help rounded transition-colors"
+                          style={{
+                            color: isHighlighted ? 'var(--text-primary)' : 'var(--text-secondary)',
+                            fontWeight: isHighlighted ? 'bold' : 'normal',
+                            backgroundColor: isHighlighted ? 'rgba(255, 255, 255, 0.06)' : 'transparent'
+                          }}
                           onMouseEnter={(e) => handleByteMouseEnter(e, offset, val)}
                           onMouseLeave={handleByteMouseLeave}
                         >
@@ -354,7 +384,13 @@ export const HexDumpPane: React.FC<HexDumpPaneProps> = ({
                 </div>
 
                 {/* ASCII blocks */}
-                <div className="w-20 text-center border-l border-[#1E1E2E]/60 ml-2 text-[#718096] select-none text-[10px]">
+                <div 
+                  className="w-20 text-center ml-2 select-none text-[9px]"
+                  style={{ 
+                    borderLeft: '1px solid var(--border-subtle)', 
+                    color: 'var(--text-muted)' 
+                  }}
+                >
                   {Array.from(row.bytes).map((b, byteIdx) => {
                     const isHighlighted = isByteInFunctionRange(row.offset + byteIdx);
                     const isPrintable = b >= 32 && b <= 126;
@@ -362,7 +398,7 @@ export const HexDumpPane: React.FC<HexDumpPaneProps> = ({
                     return (
                       <span
                         key={byteIdx}
-                        className={isHighlighted ? 'text-[#00FFC8]' : ''}
+                        style={{ color: isHighlighted ? 'var(--accent)' : 'inherit' }}
                       >
                         {charStr}
                       </span>
@@ -377,3 +413,5 @@ export const HexDumpPane: React.FC<HexDumpPaneProps> = ({
     </div>
   );
 };
+
+export default HexDumpPane;
