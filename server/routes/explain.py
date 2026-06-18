@@ -2,7 +2,9 @@ import os
 import json
 import logging
 import asyncio
-from fastapi import APIRouter, HTTPException
+import time
+from collections import deque
+from fastapi import APIRouter, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 from server.models.schemas import ExplainRequest
 from anthropic import AsyncAnthropic
@@ -20,6 +22,25 @@ SYSTEM_PROMPT = (
     "4) Any suspicious or notable patterns an auditor should review. "
     "Keep response under 300 words. Plain paragraphs — no markdown headers."
 )
+
+# In-memory rate limiter: IP -> deque of timestamps
+rate_limiter = {}
+
+def check_rate_limit(ip: str) -> bool:
+    now = time.time()
+    if ip not in rate_limiter:
+        rate_limiter[ip] = deque()
+    
+    # Remove timestamps older than 60 seconds
+    window = rate_limiter[ip]
+    while window and window[0] < now - 60:
+        window.popleft()
+        
+    if len(window) >= 10:
+        return False
+        
+    window.append(now)
+    return True
 
 async def simulated_explain_generator(req: ExplainRequest):
     """Generates realistic decompiler analysis descriptions for Demo Mode."""
@@ -55,7 +76,7 @@ async def simulated_explain_generator(req: ExplainRequest):
         )
     elif "log" in fn or "write" in fn:
         text = (
-            "This function writes logging messages. It checks the message pointer for nullity and "
+            "This function writes logging messages. It checks the message prefix for nullity and "
             "prints the message prefix to the console. It is a utility function with minimal hardware interaction."
         )
     else:
@@ -82,45 +103,44 @@ async def simulated_explain_generator(req: ExplainRequest):
 
 async def real_explain_generator(api_key: str, req: ExplainRequest):
     """Queries Anthropic API directly and streams text tokens back."""
-    client = AsyncAnthropic(api_key=api_key)
-    
     try:
-        user_content = (
-            f"Function Name: {req.function_name}\n"
-            f"Architecture: {req.arch}\n\n"
-            f"Decompiled Pseudo-C:\n{req.pseudo_c}\n\n"
-            f"Extracted Strings Context:\n{', '.join(req.context_strings[:10])}\n\n"
-            f"Global Symbols Context:\n{', '.join(req.context_symbols[:10])}"
-        )
-        
-        response = await client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=500,
-            system=SYSTEM_PROMPT,
-            messages=[
-                {"role": "user", "content": user_content}
-            ],
-            stream=True
-        )
-        
-        input_tokens = 0
-        output_tokens = 0
-        
-        async for chunk in response:
-            if chunk.type == "message_start":
-                input_tokens = chunk.message.usage.input_tokens
-            elif chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":
-                yield {
-                    "event": "token",
-                    "data": json.dumps({"token": chunk.delta.text})
-                }
-            elif chunk.type == "message_delta":
-                output_tokens = chunk.usage.output_tokens
-                
-        yield {
-            "event": "done",
-            "data": json.dumps({"tokens_used": input_tokens + output_tokens})
-        }
+        async with AsyncAnthropic(api_key=api_key) as client:
+            user_content = (
+                f"Function Name: {req.function_name}\n"
+                f"Architecture: {req.arch}\n\n"
+                f"Decompiled Pseudo-C:\n{req.pseudo_c}\n\n"
+                f"Extracted Strings Context:\n{', '.join(req.context_strings[:10])}\n\n"
+                f"Global Symbols Context:\n{', '.join(req.context_symbols[:10])}"
+            )
+            
+            response = await client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=500,
+                system=SYSTEM_PROMPT,
+                messages=[
+                    {"role": "user", "content": user_content}
+                ],
+                stream=True
+            )
+            
+            input_tokens = 0
+            output_tokens = 0
+            
+            async for chunk in response:
+                if chunk.type == "message_start":
+                    input_tokens = chunk.message.usage.input_tokens
+                elif chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":
+                    yield {
+                        "event": "token",
+                        "data": json.dumps({"token": chunk.delta.text})
+                    }
+                elif chunk.type == "message_delta":
+                    output_tokens = chunk.usage.output_tokens
+                    
+            yield {
+                "event": "done",
+                "data": json.dumps({"tokens_used": input_tokens + output_tokens})
+            }
     except Exception as e:
         logger.error(f"Claude API query exception: {e}")
         yield {
@@ -129,8 +149,17 @@ async def real_explain_generator(api_key: str, req: ExplainRequest):
         }
 
 @router.post("/explain")
-async def explain_function(req: ExplainRequest):
+async def explain_function(request: Request, req: ExplainRequest):
     """Endpoint facilitating real-time streamed explanations of decompiled logic."""
+    # Apply IP-based rate limiting
+    ip = request.client.host if request.client else "unknown"
+    if not check_rate_limit(ip):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Max 10 requests per minute.")
+
+    # Cap pseudo_c input at 3000 characters
+    if len(req.pseudo_c) > 3000:
+        req.pseudo_c = req.pseudo_c[:3000] + "\n// ... [truncated for length]"
+
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     
     if not api_key:

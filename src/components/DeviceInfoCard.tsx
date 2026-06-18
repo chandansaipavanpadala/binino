@@ -1,6 +1,7 @@
 import React from 'react';
 import { ConnectionStatus, PortMetadata } from '../hooks/useSerialPort';
 import { Info } from 'lucide-react';
+import { MCU_REGISTRY } from '../utils/mcuRegistry';
 
 interface DeviceInfoCardProps {
   connectionStatus: ConnectionStatus;
@@ -24,16 +25,13 @@ export const DeviceInfoCard: React.FC<DeviceInfoCardProps> = ({
   const isConnected = connectionStatus === 'connected';
   const isCollapsed = !isExpanded;
 
+  const selectedMcu = MCU_REGISTRY[selectedArch];
+  const protocol = selectedMcu ? selectedMcu.protocol : '—';
+
   // Format arch label for display
   const getArchLabel = (arch: string) => {
-    const archMap: Record<string, string> = {
-      esp32: 'ESP32 (Tensilica)',
-      esp8266: 'ESP8266 (L106)',
-      avr: 'AVR / ATmega',
-      cortex: 'ARM Cortex-M',
-      riscv: 'RISC-V 32-bit',
-    };
-    return archMap[arch] || arch;
+    const mcu = MCU_REGISTRY[arch];
+    return mcu ? mcu.display_name : arch;
   };
 
   return (
@@ -95,6 +93,12 @@ export const DeviceInfoCard: React.FC<DeviceInfoCardProps> = ({
             <span className="block mb-0.5 text-[10px] uppercase tracking-wider font-mono" style={{ color: 'var(--text-muted)' }}>Architecture</span>
             <span className="font-medium block" style={{ color: 'var(--text-primary)' }}>
               {isConnected ? getArchLabel(selectedArch) : '—'}
+            </span>
+          </div>
+          <div>
+            <span className="block mb-0.5 text-[10px] uppercase tracking-wider font-mono" style={{ color: 'var(--text-muted)' }}>Protocol</span>
+            <span className="font-mono block" style={{ color: 'var(--text-primary)' }}>
+              {isConnected ? protocol : '—'}
             </span>
           </div>
           <div>

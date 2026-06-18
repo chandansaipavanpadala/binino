@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ConnectionStatus } from '../hooks/useSerialPort';
 import { ExtractionStatus } from '../hooks/useFlashExtractor';
 import { ExtractionPanel } from './ExtractionPanel';
-import { RefreshCw, Play, Square } from 'lucide-react';
+import { RefreshCw, Play, Square, AlertTriangle } from 'lucide-react';
+import { MCU_REGISTRY, MCUProfile } from '../utils/mcuRegistry';
 
 interface ConnectionPanelProps {
   connectionStatus: ConnectionStatus;
@@ -56,6 +57,49 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
 }) => {
   const isCollapsed = !isHardwareExpanded;
   const isConnected = connectionStatus === 'connected';
+  const isConnecting = connectionStatus === 'connecting';
+
+  const [mcuList, setMcuList] = useState<Record<string, MCUProfile>>(MCU_REGISTRY);
+
+  // Fetch MCU registry dynamically from backend, fall back to local import on error
+  useEffect(() => {
+    fetch('http://localhost:8000/api/mcu/list')
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to fetch MCU list');
+        return res.json();
+      })
+      .then((data) => {
+        if (data && data.mcus) {
+          setMcuList(data.mcus);
+        }
+      })
+      .catch((err) => {
+        console.warn('Backend MCU registry unavailable. Using local fallback.', err);
+        setMcuList(MCU_REGISTRY);
+      });
+  }, []);
+
+  const selectedMcu = mcuList[selectedArch] || MCU_REGISTRY[selectedArch];
+
+  // Group MCUs by family
+  const groupedMcus = useMemo(() => {
+    const groups: Record<string, MCUProfile[]> = {};
+    Object.values(mcuList).forEach((mcu) => {
+      if (!groups[mcu.family]) {
+        groups[mcu.family] = [];
+      }
+      groups[mcu.family].push(mcu);
+    });
+    return groups;
+  }, [mcuList]);
+
+  const handleArchChange = (arch: string) => {
+    setSelectedArch(arch);
+    const mcu = mcuList[arch];
+    if (mcu) {
+      setSelectedBaud(mcu.default_baud);
+    }
+  };
   
   const getStatusDetails = () => {
     switch (connectionStatus) {
@@ -72,7 +116,6 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   };
 
   const status = getStatusDetails();
-  const isConnecting = connectionStatus === 'connecting';
 
   return (
     <div className="flex flex-col space-y-4">
@@ -138,7 +181,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
         <div
           className="transition-all duration-300 ease-in-out overflow-hidden"
           style={{
-            maxHeight: isCollapsed ? '0px' : '400px',
+            maxHeight: isCollapsed ? '0px' : '550px',
             opacity: isCollapsed ? 0 : 1,
             pointerEvents: isCollapsed ? 'none' : 'auto',
           }}
@@ -152,7 +195,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
               <select
                 id="arch-select"
                 value={selectedArch}
-                onChange={(e) => setSelectedArch(e.target.value)}
+                onChange={(e) => handleArchChange(e.target.value)}
                 disabled={isConnected || isConnecting}
                 className="w-full h-9 px-3 py-1.5 rounded text-xs font-sans text-[#F0F0F0] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 focus:outline-none"
                 style={{
@@ -160,13 +203,45 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
                   border: '1px solid var(--border-default)',
                 }}
               >
-                <option value="esp32">ESP32 (WROOM / WROVER)</option>
-                <option value="esp8266">ESP8266 (EX / NodeMCU)</option>
-                <option value="avr">AVR / Arduino (ATmega328P)</option>
-                <option value="cortex">ARM Cortex-M (STM32 / NXP)</option>
-                <option value="riscv">RISC-V (CH32 / ESP32-C3)</option>
+                {Object.entries(groupedMcus).map(([family, mcus]) => (
+                  <optgroup key={family} label={family} style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>
+                    {mcus.map((mcu) => (
+                      <option 
+                        key={mcu.mcu_id} 
+                        value={mcu.mcu_id}
+                        disabled={mcu.supported === false}
+                      >
+                        {mcu.display_name} {mcu.requires_tool ? ' (requires tool)' : ''} {mcu.supported === false ? ' (coming soon)' : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
             </div>
+
+            {/* Tool Warning if required */}
+            {selectedMcu && selectedMcu.requires_tool && (
+              <div 
+                className="flex items-center space-x-2 p-2 rounded text-[11px] font-sans text-amber-500 bg-amber-500/5 border border-amber-500/20"
+              >
+                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
+                <span>Requires external tool: <strong>{selectedMcu.requires_tool}</strong> for extraction</span>
+              </div>
+            )}
+
+            {/* Bootloader Note */}
+            {selectedMcu && selectedMcu.bootloader_note && (
+              <div 
+                className="p-2.5 rounded text-[10px] font-sans leading-relaxed text-[#A0A0A0]"
+                style={{ 
+                  backgroundColor: 'var(--bg-inset)', 
+                  border: '1px solid var(--border-subtle)',
+                }}
+              >
+                <span className="block font-semibold uppercase tracking-wider text-[9px] mb-1 text-amber-500">Bootloader Note</span>
+                {selectedMcu.bootloader_note}
+              </div>
+            )}
 
             {/* Baud Rate Selector */}
             <div className="flex flex-col space-y-1.5">
@@ -177,18 +252,27 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
                 id="baud-select"
                 value={selectedBaud}
                 onChange={(e) => setSelectedBaud(Number(e.target.value))}
-                disabled={isConnected || isConnecting}
+                disabled={isConnected || isConnecting || selectedMcu?.default_baud === 0}
                 className="w-full h-9 px-3 py-1.5 rounded text-xs font-sans text-[#F0F0F0] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 focus:outline-none"
                 style={{
                   backgroundColor: 'var(--bg-inset)',
                   border: '1px solid var(--border-default)',
                 }}
               >
-                <option value="9600">9600 bps</option>
-                <option value="57600">57600 bps</option>
-                <option value="115200">115200 bps (Default)</option>
-                <option value="230400">230400 bps</option>
-                <option value="460800">460800 bps</option>
+                {selectedMcu?.default_baud === 0 ? (
+                  <option value="0">N/A (USB-only)</option>
+                ) : (
+                  <>
+                    <option value="1200">1200 bps</option>
+                    <option value="9600">9600 bps</option>
+                    <option value="19200">19200 bps</option>
+                    <option value="38400">38400 bps</option>
+                    <option value="57600">57600 bps</option>
+                    <option value="115200">115200 bps</option>
+                    <option value="230400">230400 bps</option>
+                    <option value="460800">460800 bps</option>
+                  </>
+                )}
               </select>
             </div>
 
@@ -251,6 +335,8 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
         isBrowserSupported={isBrowserSupported}
         isExpanded={isExtractorExpanded}
         onToggle={onToggleExtractor}
+        flashSizes={selectedMcu?.flash_sizes}
+        defaultFlashSize={selectedMcu?.default_flash_size}
       />
     </div>
   );

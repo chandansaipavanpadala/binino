@@ -1,9 +1,9 @@
 import json
 import logging
-from fastapi import APIRouter, HTTPException
+import asyncio
+from fastapi import APIRouter, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 from server.services.job_manager import job_manager
-from server.services.ghidra_runner import ghidra_runner
 from server.models.schemas import JobStatusResponse, AnalysisResultResponse
 
 # Setup router
@@ -11,47 +11,77 @@ router = APIRouter(prefix="/api")
 logger = logging.getLogger("binino.analyze")
 
 @router.get("/analyze/{job_id}")
-async def analyze_firmware(job_id: str):
+async def analyze_firmware(request: Request, job_id: str):
     """Establishes a Server-Sent Events (SSE) stream reporting Ghidra decompilation updates."""
     record = job_manager.get_job(job_id)
     if not record:
         raise HTTPException(status_code=404, detail="Analysis job not found.")
 
     async def event_generator():
+        last_percent = -1
+        last_status = ""
         try:
             logger.info(f"SSE analysis stream established for job {job_id}")
-            # Mark status as running at start
-            job_manager.update_job_progress(job_id, percent=5, status="running")
             
-            async for update in ghidra_runner.run_analysis(job_id, record.filepath, record.arch):
-                event_name = update["event"]
-                data = update["data"]
+            while True:
+                # Check for disconnection
+                if await request.is_disconnected():
+                    logger.info(f"SSE client disconnected for job {job_id}")
+                    break
 
-                # Update in-memory job records based on stream output
-                if event_name == "status":
-                    job_manager.update_job_progress(
-                        job_id,
-                        percent=data["percent"],
-                        status="running"
-                    )
-                elif event_name == "result":
-                    job_manager.set_job_result(job_id, result=data)
-                elif event_name == "error":
-                    job_manager.update_job_progress(
-                        job_id,
-                        percent=0,
-                        status="failed",
-                        error=data["message"]
-                    )
+                rec = job_manager.get_job(job_id)
+                if not rec:
+                    yield {
+                        "event": "error",
+                        "data": json.dumps({
+                            "stage": "Failed",
+                            "message": "Analysis job disappeared.",
+                            "percent": 0
+                        })
+                    }
+                    break
+
+                # Yield update if percent or status changed
+                if rec.percent != last_percent or rec.status != last_status:
+                    last_percent = rec.percent
+                    last_status = rec.status
+                    
+                    if rec.status == "completed":
+                        yield {
+                            "event": "result",
+                            "data": json.dumps(rec.result)
+                        }
+                        break
+                    elif rec.status == "failed":
+                        yield {
+                            "event": "error",
+                            "data": json.dumps({
+                                "stage": "Failed",
+                                "message": rec.error or "Analysis failed",
+                                "percent": 0
+                            })
+                        }
+                        break
+                    else:
+                        yield {
+                            "event": "status",
+                            "data": json.dumps({
+                                "stage": "Analyzing",
+                                "percent": rec.percent
+                            })
+                        }
+
+                if rec.completion_event.is_set():
+                    # Handle final status yield in next loop iteration
+                    continue
                 
-                # Format to SSE payload
-                yield {
-                    "event": event_name,
-                    "data": json.dumps(data)
-                }
+                try:
+                    await asyncio.wait_for(rec.completion_event.wait(), timeout=0.5)
+                except asyncio.TimeoutError:
+                    pass
+
         except Exception as ex:
             logger.error(f"Fatal exception in SSE stream for job {job_id}: {ex}")
-            job_manager.update_job_progress(job_id, percent=0, status="failed", error=str(ex))
             yield {
                 "event": "error",
                 "data": json.dumps({

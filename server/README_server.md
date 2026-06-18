@@ -6,10 +6,23 @@ The Binino Handoff Server is a lightweight, self-hosted FastAPI service that han
 
 ## Technical Architecture
 
-1. **Upload Handler**: Validates binary images up to 32MB. Sanitizes input filenames to block path traversal, and stores files in clean workspace directories.
-2. **Asynchronous Subprocess**: Spawns `$GHIDRA_HOME/support/analyzeHeadless` in a non-blocking process.
-3. **SSE Progress Stream**: Monitors process output logs and pipes status milestones (Import, Auto Analysis, Decompilation, Export) in real time back to the browser interface.
-4. **Simulation Fallback**: If Ghidra is not installed, the server automatically starts a simulation timeline emitting milestones and mock code.
+1. **Microcontroller Registry**: Contains a comprehensive profile database of 36 distinct MCU variants across 11 chip families. Every profile defines the target architecture, default baud rate, flash memory base address, default and alternative flash sizes, requires_tool flags, and contextual bootloader connection notes.
+2. **Upload Handler**: Validates binary images up to 32MB against allowed MCU registry targets. Instantly triggers a background asynchronous analysis task upon saving.
+3. **Asynchronous Subprocess**: Spawns `$GHIDRA_HOME/support/analyzeHeadless` in a thread-safe process. Enforces explicit memory boundary parameters (`-loader BinaryLoader` and `-loader-baseAddr`) to ensure raw binary images decompile with correct absolute memory layouts.
+4. **SSE Progress Stream**: Monitored by `asyncio.Event` synchronization. Progress markers read stdout log messages (including standard Ghidra 11.x/12.x output lines) and pipe status milestones in real time.
+5. **Simulation Fallback**: If Ghidra is not available, the server launches an MCU-aware simulation mode generating specific C functions (e.g. AVR setup/loop/ISR, STM32 SystemInit/HAL_Init/MX_GPIO_Init) and runs with a progress speed proportional to the target flash memory size.
+6. **API Security & Constraints**: Limits AI decompilation explanations to a maximum of 10 requests per minute per IP address (tracked via sliding-window deques) and truncates input logic beyond 3,000 characters.
+
+---
+
+## API Endpoints
+
+- **GET /api/mcu/list**: Returns the complete microcontroller registry.
+- **POST /api/upload**: Accepts binary firmware uploads, checks architecture validity, and schedules the background analysis runner.
+- **GET /api/analyze/{job_id}**: Establishes the real-time Server-Sent Events progress stream.
+- **GET /api/jobs/{job_id}**: Reports current status percent and availability of results.
+- **GET /api/result/{job_id}**: Fetches decompiled functions, symbols table, and character strings.
+- **POST /api/explain**: Streams detailed AI-powered explanations of decompiled code.
 
 ---
 

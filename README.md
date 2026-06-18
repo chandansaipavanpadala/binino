@@ -7,11 +7,12 @@ BININO is a universal, web-based toolkit designed for firmware extraction, stati
 ## Key Features and Capabilities
 
 * **Web-Based Hardware Bridge**: Connect directly to microcontrollers (ESP32, ESP8266, ARM Cortex-M, AVR, RISC-V) via USB from the browser, eliminating the need for local drivers or native client installations.
-* **ROM Bootloader Extractor**: Employs esptool-style SLIP bootloader handshakes to cycle DTR/RTS lines, force target devices into download mode, and extract raw flash memory blocks with active XOR checksum verification.
+* **Expanded Microcontroller Registry**: Configured with a comprehensive database of 36 distinct MCU variants across 11 major chip families (Espressif, AVR, STM32, RP-series, SAMD, Nordic nRF, NXP LPC, TI MSP430, WCH, Renesas, Silicon Labs, Infineon, and GigaDevice).
+* **Automated ROM Extraction Protocols**: Includes 10 standalone protocol handler modules covering Espressif SLIP, STM32 AN3155 UART, STK500v1/v2, AVR109, UPDI, BOSSA, TI-BSL BSL, NRF-DFU, WCH-ISP, LPC-ISP ASCII sync, and Silicon Labs EFM32 XMODEM-CRC.
 * **Unified Accordion Sidebar**: Provides a smooth transition through the connection, extraction, metadata, and handoff stages with a mutually exclusive collapsible sidebar stack.
-* **Automated Ghidra Pipeline**: Executes headless Ghidra analysis on a local FastAPI server. Disassembles and decompiles imported binary blobs, mapping raw instructions back into clean pseudo-C, symbols, and string tables.
+* **Automated Ghidra Pipeline**: Executes headless Ghidra analysis on a local FastAPI server. Disassembles and decompiles imported binary blobs, enforcing explicit memory boundaries (`-loader BinaryLoader` and dynamic `-loader-baseAddr`) and mapping raw instructions back into clean pseudo-C, symbols, and string tables.
 * **IDE-Style Code Explorer**: Features a three-pane layout including a function/symbol list searcher, a syntax-highlighted decompiler view (C and Assembly), and a virtualized memory Hex Dump synced to the active function's bounds.
-* **Claude AI Assistant**: Streams step-by-step plain-English explanations of target functions directly in the IDE to assist in security reviews and hardware audits.
+* **Claude AI Assistant**: Streams step-by-step plain-English explanations of target functions directly in the IDE to assist in security reviews and hardware audits. Enforces sliding-window rate limits (10 requests/min per IP) and input limits (3,000 characters).
 * **Portable HTML Reports**: Exports fully self-contained offline reports containing all decompiled C code, assembly listings, symbols, and strings.
 
 ---
@@ -59,38 +60,36 @@ Phase 1 implements the raw serial interface and logging views:
 * **Millisecond Precision Logging**: Formats all logging and terminal timestamps to `HH:MM:SS.mmm` format.
 * **Live Hex Preview**: Renders raw serial traffic in a side-by-side hexadecimal octet and ASCII preview strip.
 
-### Phase 2: ROM Bootloader Flash Extractor
-Phase 2 implements the Espressif bootloader interface to extract raw SPI flash memory over USB:
-* **Hardware Reset Sequences**: Pulls Data Terminal Ready (DTR) and Request to Send (RTS) serial lines high/low with precise 100ms timings. Toggles target Chip Enable (EN) and boot pins (GPIO0) to force the microcontroller into its internal ROM download mode.
-* **SLIP Framing**: Encapsulates command packets using Serial Line Internet Protocol (SLIP). Frames data with boundary characters (`0xC0`) and escapes occurrences of control characters (`0xC0` -> `0xDB 0xDC`, `0xDB` -> `0xDB 0xDD`).
-* **SYNC Handshake**: Transmits command `0x08` along with a 36-byte training pattern, validating incoming responses and retrying up to 10 times with 500ms timeouts on failures.
-* **Flash Memory Reading**: Sends `READ_FLASH` command (`0x03`) in sequential 1024-byte block increments. Validates incoming payload layouts and calculates an 8-bit XOR checksum (seed value `0xEF`) to check data integrity. Retries block read operations up to 3 times on checksum errors before terminating the sequence.
+### Phase 2: ROM Bootloader Flash Extractor and Protocols
+Phase 2 implements the microcontroller bootloader interfaces to extract raw SPI flash memory over USB/serial:
+* **Hardware Reset Sequences**: Pulls Data Terminal Ready (DTR) and Request to Send (RTS) serial lines high/low with precise timings. Toggles Chip Enable (EN) and boot pins to force the target device into download mode.
+* **Espressif SLIP & Chip Detection**: Implements esptool-style SLIP framing with escape patterns. Runs automatic chip signature checks using memory reads (`0x40001000`) and partition table parses (`0x8000`) to detect ESP32 variants.
+* **STM32 AN3155 Bootloader**: Performs `0x7F` autobaud initialization, validates ACK/NACK responses, and executes block reading (`0x11` read command) in 256-byte blocks from base address `0x08000000`.
+* **AVR butterfly/stk500 & SAMD BOSSA**: Supports STK500v1 handshakes (sync checks, page loads, and 128-byte block reads), Butterfly/AVR109 sequences, and BOSSA resets via 1200-baud touch triggers.
+* **Additional Protocols**: Includes MSP430 TI-BSL pin toggling and two's complement checksum validation, Nordic nRF McuBoot serial DFU, NXP LPC ASCII-based synchronization with UU-decoding, and EFM32 XMODEM-CRC file transfers with CRC-16 checks.
 
-### Phase 3: Backend Handoff Server and Ghidra 12 Compatibility
-Phase 3 implements the local Python backend that parses raw binary blobs using static reverse-engineering tools:
+### Phase 3: Backend Handoff Server and Job Coordinator
+Phase 3 implements the local Python backend that handles jobs and coordinates decompilation:
 * **FastAPI Server**: Lightweight API running on `localhost:8000` with CORS mappings for frontend client environments.
-* **Job Queue Manager**: Allocates a workspace directory for each decompilation job. Runs a background garbage-collection loop that purges job outputs older than 1 hour to prevent disk depletion.
-* **Ghidra Headless Integration**: Spawns `$GHIDRA_HOME/support/analyzeHeadless.bat` in a non-blocking subprocess. Registers a post-analysis Java script (`ExportDecompiled.java`) to iterate through functions, extracting assembly sequences and pseudo-C code blocks.
-* **API Classpath Fixes**: Rewrote the headless decompiler script (`ExportDecompiled.java`) string extractor to use `DefinedDataIterator.byDataInstance` combined with a `StringDataInstance` filter. This ensures compatibility with Ghidra 12.1.2 where the static `definedStrings(Program)` method is absent.
-* **Server-Sent Events (SSE)**: Streams real-time subprocess stdout logs back to the browser. The frontend decodes these events to update progress steps (Import, Auto Analysis, Decompilation, Export) and percent metrics.
+* **Asynchronous Job Coordinator**: Tracks jobs inside an in-memory database using `JobRecord` models. Spawns asynchronous background tasks immediately upon upload instead of holding the client stream. Updates status state dynamically using thread-safe `asyncio.Event` models.
+* **Folder Sanitization & Cleanup**: Prevents directory traversal attacks by generating job IDs as strict uuid4 strings without dashes. Runs a cleanup loop purging finished jobs older than 1 hour (never active running jobs).
+* **SSE Concurrency**: Streams decompiler progress milestones and disconnects gracefully if the client leaves or refreshes the page.
 
-### Phase 4: Interactive Code Explorer
-Phase 4 creates a multi-pane development environment to browse decompiled binary findings:
+### Phase 4: Headless Ghidra Subprocess Integration
+Phase 4 handles automated headless Ghidra subprocess calls:
+* **Binary Boundaries**: Configures headless command lines with `-loader BinaryLoader` and dynamic `-loader-baseAddr` settings mapping to the selected microcontroller's real memory offsets.
+* **Stdout Log Parsing**: Parses standard Ghidra 11.x/12.x output lines (`AutoAnalysisManager`, `HeadlessAnalyzer`) to map progress steps.
+* **Defined String Iterators**: Extracts decompiled metadata inside `ExportDecompiled.java` using a `StringDataInstance` filter compatible with Ghidra 12.1.2 structure templates.
+* **MCU-Aware Simulation**: Fallback simulation generates custom stubs (AVR setup/loop/ISR, STM32 SystemInit/HAL_Init/MX_GPIO_Init, RP-series main/gpio_init/multicore_launch_core1) and applies execution delays proportional to the target flash memory size.
+
+### Phase 5: Interactive Code Explorer
+Phase 5 creates a multi-pane development environment to browse decompiled binary findings:
 * **Navigator Pane**: Displays list search tabs for functions, strings, and symbols. The entry point is pinned at the top with a flag icon.
 * **Decompiled Code Viewer**: Displays pseudo-C code and assembly blocks side-by-side. Uses custom regex tokenizers to style keywords, types, labels, comments, and strings. Offers word-wrap switches and click-to-copy line number paths (`filename:line`).
-* **Hex Virtualizer**: Renders the complete binary dump virtualized to target architecture addresses (e.g. `0x40080000` for ESP32). Features address search inputs, active function bounds highlighting, and interactive byte tooltips displaying decimal, binary, and ASCII representations.
+* **Hex Virtualizer**: Renders the complete binary dump virtualized to target architecture addresses (e.g. `0x08000000` for STM32). Features address search inputs, active function bounds highlighting, and interactive byte tooltips displaying decimal, binary, and ASCII representations.
 * **Splitters and Persistence**: Features resizable split-pane widths that persist in the browser's `localStorage` alongside word-wrap preferences.
 
-### Phase 5: Claude AI Explain and Production Polish
-Phase 5 implements AI-assisted code walkthroughs and production-grade audits:
-* **AI Explain API**: Integrates the Anthropic Python client in the backend. Streams token-by-token function explanations using Claude model `claude-3-5-sonnet-20241022` to describe function goals, hardware register reads, loops, and security audit flags.
-* **Typewriter Hook**: Uses `fetch` and `ReadableStream` to stream text blocks in real time.
-* **Offline HTML Report**: Generates a self-contained report containing all functions, pseudo-C blocks with syntax highlighting CSS, and symbols for offline review.
-* **Fault Tolerant Boundaries**: Wraps the Code Explorer overlay in React `ErrorBoundary` handlers that display crash diagnostics and log issues to the terminal.
-* **Accessibility and Focus**: Traps keyboard focus inside the modal overlays, adds appropriate `aria-label` tags, and flags `role="tab"` and `role="tablist"` attributes.
-* **Responsive Layouts**: Collapses panels on viewports less than 900px wide into a single-pane tabbed selector.
-
-### Phase 6: Animated Transitions, Layout Height, and Safety Locks
+### Phase 6: Production Polish and Safety Locks
 Phase 6 adds layout responsiveness and operation protections:
 * **Accordion Sidebar Stack**: Left-hand control cards use a shared state in `Dashboard.tsx` to expand one panel while automatically collapsing others. It auto-focuses the next stage (e.g., expanding the decompiler handoff once extraction is complete).
 * **Smooth CSS Transitions**: Replaced snap unmounting with CSS transitions on `max-height`, `opacity`, and `pointer-events` to yield smooth collapsible animations.
@@ -104,18 +103,40 @@ Phase 6 adds layout responsiveness and operation protections:
 
 The FastAPI backend exposes the following endpoints:
 
-### 1. Upload Firmware
+### 1. Get Microcontroller Registry
+* **Route**: `GET /api/mcu/list`
+* **Response (JSON)**:
+  ```json
+  {
+    "mcus": {
+      "esp32": {
+        "mcu_id": "esp32",
+        "display_name": "ESP32 (Xtensa dual-core)",
+        "family": "Espressif",
+        "protocol": "SLIP",
+        "ghidra_lang": "Xtensa:LE:32:default",
+        "default_baud": 115200,
+        "flash_base": 0,
+        "default_flash_size": 4194304,
+        "flash_sizes": [1048576, 2097152, 4194304, 8388608, 16777216],
+        "bootloader_note": "Hold the BOOT/GPIO0 button..."
+      }
+    }
+  }
+  ```
+
+### 2. Upload Firmware
 * **Route**: `POST /api/upload`
 * **Content-Type**: `multipart/form-data`
 * **Request**:
   - `file`: Raw firmware binary (`.bin`).
-  - `arch`: Target architecture (`esp32`, `esp8266`, `avr`, `cortex`, `riscv`).
+  - `arch`: Target architecture (validated against registry `mcu_id`, e.g. `esp32c3`, `atmega328p`, `stm32f4`).
   - `flash_size`: Expected file size in bytes.
 * **Response (JSON)**:
   ```json
   {
-    "job_id": "job_a1b2c3d4",
-    "filename": "firmware_esp32.bin",
+    "job_id": "joba1b2c3d4e5f6g7h8i9j0",
+    "filename": "firmware.bin",
     "size_bytes": 4194304,
     "arch": "esp32",
     "status": "queued",
@@ -123,7 +144,7 @@ The FastAPI backend exposes the following endpoints:
   }
   ```
 
-### 2. Stream Ghidra Progress
+### 3. Stream Ghidra Progress
 * **Route**: `GET /api/analyze/{job_id}`
 * **Response**: `text/event-stream` (Server-Sent Events)
 * **Events**:
@@ -131,30 +152,27 @@ The FastAPI backend exposes the following endpoints:
     ```json
     {
       "stage": "Decompiling",
-      "message": "Running decompilation analyzer and recovering AST constructs...",
       "percent": 70
     }
     ```
-  - `event: result`: Emits the parsed `AnalysisResult` JSON payload upon completion.
+  - `event: result`: Emits the parsed `AnalysisResult` JSON payload containing symbols, strings, functions list, base address, and registry profiles.
   - `event: done`: Signals stream termination.
   - `event: error`: Emits failure messages.
 
-### 3. Stream Claude AI Explanations
+### 4. Stream Claude AI Explanations
 * **Route**: `POST /api/explain`
+* **Headers**: `X-Forwarded-For` / IP details mapped to rate limit checkers.
 * **Request (JSON)**:
   ```json
   {
     "function_name": "wifi_connect_ap",
     "arch": "esp32",
     "pseudo_c": "int wifi_connect_ap(...) { ... }",
-    "context_strings": ["Connecting to SSID", "auth error"],
-    "context_symbols": ["wifi_init", "printf"]
+    "context_strings": ["Connecting to SSID"],
+    "context_symbols": ["wifi_init"]
   }
   ```
-* **Response**: `text/event-stream`
-* **Events**:
-  - `event: token`: Emits text delta chunks: `{"token": "This function "}`.
-  - `event: done`: Emits usage tokens counts: `{"tokens_used": 412}`.
+* **Response**: `text/event-stream` (subject to 10 requests/min/IP rate limiting; truncates `pseudo_c` at 3,000 characters).
 
 ---
 
@@ -224,7 +242,7 @@ To compile and execute the complete pipeline, your system must have:
 
 ## Testing in Demo Mode
 
-If you do not have physical microcontrollers or a Ghidra environment set up, you can run the complete workflow using **Demo Mode**:
+If you do not have microcontrollers or a Ghidra environment set up, you can run the complete workflow using **Demo Mode**:
 
 1. Toggle **Demo Mode: ON** in the top navigation bar.
 2. Click **Establish Bridge** in the connection panel. The terminal logs a virtual hardware connection to a mock microcontroller.
@@ -245,7 +263,22 @@ binino/
 ├── server/                        # Python FastAPI backend
 │   ├── models/
 │   │   └── schemas.py             # Pydantic validation schemas
+│   ├── protocols/                 # 10 hardware serial protocol modules
+│   │   ├── __init__.py
+│   │   ├── slip.py                # Espressif SLIP logic & signatures
+│   │   ├── stm32_uart.py          # STM32 AN3155 bootloader
+│   │   ├── stk500v1.py            # AVR STK500v1 protocol
+│   │   ├── bossa.py               # SAMD BOSSA protocol
+│   │   ├── ti_bsl.py              # MSP430 Bootstrap Loader (BSL)
+│   │   ├── nrf_dfu.py             # Nordic nRF serial DFU
+│   │   ├── wch_isp.py             # WCH RISC-V and 8051 ISP
+│   │   ├── lpc_isp.py             # NXP LPC ASCII ISP
+│   │   ├── picotool.py            # Picotool USB MSD copy bridge
+│   │   └── xmodem_uart.py         # EFM32 XMODEM-CRC protocol
+│   ├── registry/
+│   │   └── mcu_registry.py        # 36 MCU variant registry database
 │   ├── routes/
+│   │   ├── mcu.py                 # Registry list API route
 │   │   ├── upload.py              # Multipart firmware uploads route
 │   │   ├── analyze.py             # Ghidra analysis and SSE progress route
 │   │   └── explain.py             # Anthropic Claude API explain route
@@ -257,10 +290,11 @@ binino/
 │   ├── requirements.txt           # Python backend dependencies
 │   └── README_server.md           # Backend installation guide
 ├── src/                           # Frontend React application
-│   ├── assets/                    # Image files and graphic layouts
+│   ├── assets/                    # Image files and favicon graphics
 │   ├── types/
 │   │   └── analysis.ts            # Analysis result types definitions
 │   ├── utils/
+│   │   ├── mcuRegistry.ts         # Frontend local registry fallback copy
 │   │   └── reportGenerator.ts     # Standalone HTML report generator
 │   ├── hooks/
 │   │   ├── useSerialPort.ts       # Web Serial bridge state hook
@@ -337,4 +371,3 @@ Ensure that all modifications respect the project styling system and compile cle
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for the full text.
 
 Copyright (c) 2026 Chandan Sai Pavan Padala.
-

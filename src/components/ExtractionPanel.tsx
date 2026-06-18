@@ -18,6 +18,8 @@ interface ExtractionPanelProps {
   isBrowserSupported?: boolean;
   isExpanded: boolean;
   onToggle: () => void;
+  flashSizes?: number[];
+  defaultFlashSize?: number;
 }
 
 export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
@@ -35,9 +37,18 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
   isBrowserSupported = true,
   isExpanded,
   onToggle,
+  flashSizes,
+  defaultFlashSize,
 }) => {
-  const [selectedSize, setSelectedSize] = useState<number>(0x400000); // Default 4MB
+  const [selectedSize, setSelectedSize] = useState<number>(defaultFlashSize || 0x400000); // Default 4MB
   const isCollapsed = !isExpanded;
+
+  // Sync selected size with selected MCU defaults
+  useEffect(() => {
+    if (defaultFlashSize !== undefined) {
+      setSelectedSize(defaultFlashSize);
+    }
+  }, [defaultFlashSize]);
 
   // ETA and Speed calculations state
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -71,14 +82,20 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
   // Toggle button availability
   const isExtractDisabled = (!isConnected && !isDemoMode) || isRunning || !isBrowserSupported;
 
-  // Format size dropdown choices
-  const sizeOptions = [
-    { label: '1 MB', value: 0x100000 },
-    { label: '2 MB', value: 0x200000 },
-    { label: '4 MB (Default)', value: 0x400000 },
-    { label: '8 MB', value: 0x800000 },
-    { label: '16 MB', value: 0x1000000 },
-  ];
+  // Helper to format bytes to readable size
+  const formatBytes = (bytes: number): string => {
+    if (bytes >= 1024 * 1024) {
+      return `${bytes / (1024 * 1024)} MB`;
+    }
+    if (bytes >= 1024) {
+      return `${bytes / 1024} KB`;
+    }
+    return `${bytes} B`;
+  };
+
+  const finalFlashSizes = flashSizes && flashSizes.length > 0 
+    ? flashSizes 
+    : [0x100000, 0x200000, 0x400000, 0x800000, 0x1000000];
 
   // Helper: format speed output string
   const formatSpeed = (bytesPerSec: number): string => {
@@ -216,9 +233,9 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
                 border: '1px solid var(--border-default)',
               }}
             >
-              {sizeOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
+              {finalFlashSizes.map((size) => (
+                <option key={size} value={size}>
+                  {formatBytes(size)} {size === defaultFlashSize ? '(Default)' : ''}
                 </option>
               ))}
             </select>

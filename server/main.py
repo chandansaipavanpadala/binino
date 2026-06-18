@@ -4,8 +4,9 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from server.routes import upload, analyze, explain
+from server.routes import upload, analyze, explain, mcu
 from server.services.job_manager import job_manager
+
 
 # Configure logging
 logging.basicConfig(
@@ -60,6 +61,8 @@ app.add_middleware(
 app.include_router(upload.router)
 app.include_router(analyze.router)
 app.include_router(explain.router)
+app.include_router(mcu.router)
+
 
 @app.get("/")
 def read_root():
