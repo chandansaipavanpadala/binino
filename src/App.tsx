@@ -9,6 +9,7 @@ import { HandoffPanel } from './components/HandoffPanel';
 import { TerminalPane } from './components/TerminalPane';
 import { HexPreviewStrip } from './components/HexPreviewStrip';
 import { AlertTriangle, AlertCircle } from 'lucide-react';
+import { CodeExplorer } from './components/CodeExplorer';
 
 const App: React.FC = () => {
   const {
@@ -37,6 +38,7 @@ const App: React.FC = () => {
   } = useSerialPort();
 
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
+  const [isExplorerOpen, setIsExplorerOpen] = useState<boolean>(false);
 
   // Sync Demo Mode status with serial bridge state
   useEffect(() => {
@@ -194,6 +196,7 @@ const App: React.FC = () => {
                 sendToServer={sendToServer}
                 cancelHandoff={cancelHandoff}
                 flashSize={flashBuffer ? flashBuffer.length : 0}
+                onOpenExplorer={() => setIsExplorerOpen(true)}
               />
             )}
           </section>
@@ -219,6 +222,13 @@ const App: React.FC = () => {
       <footer className="py-4 border-t border-[#1E1E2E] text-center text-[10px] text-slate-500 font-sans mt-auto">
         Binino Toolkit — Browser-to-Hardware Flash Extractor (Phase 2)
       </footer>
+      {isExplorerOpen && result && (
+        <CodeExplorer
+          result={result}
+          flashBuffer={flashBuffer}
+          onClose={() => setIsExplorerOpen(false)}
+        />
+      )}
     </div>
   );
 };

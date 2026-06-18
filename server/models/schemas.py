@@ -15,12 +15,30 @@ class JobStatusResponse(BaseModel):
     percent: int
     result_available: bool
 
+class FunctionRecord(BaseModel):
+    name: str
+    address: str
+    size: Optional[int] = None
+    pseudo_c: str
+    assembly: Optional[str] = None
+
+class StringRecord(BaseModel):
+    address: str
+    value: str
+    encoding: Optional[str] = None
+
+class SymbolRecord(BaseModel):
+    address: str
+    name: str
+    type: Optional[str] = None
+
 class AnalysisResultResponse(BaseModel):
     job_id: str
     arch: str
-    functions: List[str]
-    strings: List[str]
-    symbols: List[str]
+    functions: List[FunctionRecord]
+    strings: List[StringRecord]
+    symbols: List[SymbolRecord]
     entry_point: str
     raw_assembly_snippet: str
-    raw_c: Optional[str] = None
+    simulated: Optional[bool] = None
+

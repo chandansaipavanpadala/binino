@@ -13,6 +13,7 @@ interface HandoffPanelProps {
   sendToServer: () => Promise<void>;
   cancelHandoff: () => void;
   flashSize: number;
+  onOpenExplorer?: () => void;
 }
 
 export const HandoffPanel: React.FC<HandoffPanelProps> = ({
@@ -25,6 +26,7 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
   sendToServer,
   cancelHandoff,
   flashSize,
+  onOpenExplorer,
 }) => {
   
   const isIdle = uploadStatus === 'idle';
@@ -246,9 +248,12 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
             {/* View in Code Explorer Trigger */}
             <button
               onClick={() => {
-                // PHASE 4: Open Code Explorer with result
-                console.log('PHASE 4: Launching Code Explorer with result:', result);
-                alert('Phase 3 complete! Reconstructed pseudo-C is now cached in memory for Phase 4 Code Explorer.');
+                if (onOpenExplorer) {
+                  onOpenExplorer();
+                } else {
+                  console.log('PHASE 4: Launching Code Explorer with result:', result);
+                  alert('Phase 3 complete! Reconstructed pseudo-C is now cached in memory for Phase 4 Code Explorer.');
+                }
               }}
               className="w-full h-10 flex items-center justify-center space-x-2 text-sm font-semibold rounded-md bg-[#00FFC8] text-[#0A0A0F] hover:bg-[#00E0B0] transition-colors"
             >

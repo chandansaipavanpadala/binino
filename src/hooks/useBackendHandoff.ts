@@ -218,26 +218,220 @@ export const useBackendHandoff = ({
         setAnalysisStage('Decompilation complete.');
         
         // Mock payload results matching schemas
+        const baseAddr = selectedArch === 'esp32' ? 0x40080000 : 0x08000000;
+        const hexAddr = (offset: number) => `0x${(baseAddr + offset).toString(16).padStart(8, '0')}`;
+
         setResult({
           job_id: 'demo_job_mock',
           arch: selectedArch,
-          functions: ['app_main', 'system_init', 'wifi_connect_ap', 'process_packet', 'sensor_read_loop', 'log_write'],
-          strings: [
-            '[SIMULATED — Ghidra not installed]',
-            'WiFi Connection established successfully',
-            'Binino Handoff active',
-            'Device initialized in bootloader mode'
-          ],
-          symbols: ['_start', 'ROM_Vector_Table', 'esp_heap_alloc', 'vTaskDelay', 'sensor_isr'],
-          entry_point: selectedArch === 'esp32' ? '0x40080000' : '0x08000000',
-          raw_assembly_snippet: 'entry app_main:\n  entry a1, 32\n  l32r a8, wifi_config\n  call8 esp_wifi_init\n  retw.n',
-          raw_c: `// [SIMULATED — Ghidra not installed]
-// Reconstructed C code from ${selectedArch.toUpperCase()} backup image
-
-#include <stdio.h>
-#include <stdint.h>
-
-void app_main() {
+          simulated: true,
+          entry_point: hexAddr(0x1200),
+          raw_assembly_snippet: '; Entry point raw assembly dump\nmain:\n  push {r7, lr}\n  add r7, sp, #0\n  bl system_init\n  bl app_main\n  movs r0, #0\n  pop {r7, pc}',
+          functions: [
+            {
+              name: 'system_init',
+              address: hexAddr(0x0100),
+              size: 64,
+              pseudo_c: `void system_init() {
+    // Initialise hardware peripherals and system clocks
+    uint32_t *pcr = (uint32_t *)0x3FF00044;
+    *pcr |= 0x00000003; // Enable CPU PLL
+    
+    // Configure default watchdog boundaries
+    volatile uint32_t *wdt = (uint32_t *)0x60000900;
+    *wdt = 0; // Disable watchdog timer for boot
+    
+    printf("Device initialized in bootloader mode\\n");
+}`,
+              assembly: `; system_init implementation
+system_init:
+  entry a1, 32
+  movi a8, 0x3FF00044
+  l32i a9, a8, 0
+  or a9, a9, 3
+  s32i a9, a8, 0
+  movi a8, 0x60000900
+  movi a9, 0
+  s32i a9, a8, 0
+  l32r a8, .LC_INIT_STR  ; "Device initialized in bootloader mode\\n"
+  mov a2, a8
+  call8 printf
+  retw`
+            },
+            {
+              name: 'wifi_connect_ap',
+              address: hexAddr(0x0500),
+              size: 112,
+              pseudo_c: `int wifi_connect_ap(const char *ssid, const char *password) {
+    if (ssid == NULL || password == NULL) {
+        return -1;
+    }
+    
+    printf("Attempting WiFi connect to: %s\\n", ssid);
+    // Simulated WiFi register handshake
+    volatile uint32_t *wifi_status = (uint32_t *)0x60001000;
+    
+    int retries = 0;
+    while ((*wifi_status & 1) == 0) {
+        if (retries++ > 5) {
+            return -2; // Connection timeout
+        }
+        vTaskDelay(20);
+    }
+    return 0; // Success
+}`,
+              assembly: `; wifi_connect_ap implementation
+wifi_connect_ap:
+  entry a1, 32
+  beqz a2, .L_WIFI_ERR
+  beqz a3, .L_WIFI_ERR
+  mov a6, a2
+  l32r a2, .LC_CONNECT_STR  ; "Attempting WiFi connect to: %s\\n"
+  mov a3, a6
+  call8 printf
+  movi a8, 0x60001000
+  movi a7, 0 ; retries
+.L_WIFI_LOOP:
+  l32i a9, a8, 0
+  extui a9, a9, 0, 1
+  bnez a9, .L_WIFI_OK
+  addi a7, a7, 1
+  movi a9, 5
+  blt a9, a7, .L_WIFI_TIMEOUT
+  movi a2, 20
+  call8 vTaskDelay
+  j .L_WIFI_LOOP
+.L_WIFI_ERR:
+  movi a2, -1
+  retw
+.L_WIFI_TIMEOUT:
+  movi a2, -2
+  retw
+.L_WIFI_OK:
+  movi a2, 0
+  retw`
+            },
+            {
+              name: 'process_packet',
+              address: hexAddr(0x0900),
+              size: 144,
+              pseudo_c: `void process_packet(uint32_t data) {
+    uint8_t type = (data >> 24) & 0xFF;
+    uint16_t length = (data >> 8) & 0xFFFF;
+    uint8_t checksum = data & 0xFF;
+    
+    // Checksum verification rule: sum of parts
+    uint8_t computed = (type + (length & 0xFF) + ((length >> 8) & 0xFF)) & 0xFF;
+    if (computed != checksum) {
+        log_write("Fatal interrupt caught in task queue");
+        return;
+    }
+    
+    switch (type) {
+        case 0xA1: // PING
+            break;
+        case 0xB2: // SENSOR_DATA
+            // Process payload
+            break;
+        default:
+            break;
+    }
+}`,
+              assembly: `; process_packet implementation
+process_packet:
+  entry a1, 32
+  extui a8, a2, 24, 8 ; type
+  extui a9, a2, 8, 16 ; length
+  extui a10, a2, 0, 8 ; checksum
+  add a11, a8, a9
+  extui a12, a9, 8, 8
+  add a11, a11, a12
+  extui a11, a11, 0, 8
+  beq a11, a10, .L_PKT_OK
+  l32r a2, .LC_ERR_STR ; "Fatal interrupt caught in task queue"
+  call8 log_write
+  retw
+.L_PKT_OK:
+  movi a7, 161 ; 0xA1
+  beq a8, a7, .L_PKT_PING
+  movi a7, 178 ; 0xB2
+  beq a8, a7, .L_PKT_DATA
+  retw
+.L_PKT_PING:
+  retw
+.L_PKT_DATA:
+  retw`
+            },
+            {
+              name: 'sensor_read_loop',
+              address: hexAddr(0x0d00),
+              size: 96,
+              pseudo_c: `uint32_t sensor_read_loop() {
+    // Read from digital sensor ADC registers
+    volatile uint32_t *adc_data = (uint32_t *)0x60002104;
+    volatile uint32_t *adc_ctrl = (uint32_t *)0x60002100;
+    
+    *adc_ctrl |= 1; // Trigger read conv
+    while ((*adc_ctrl & 2) == 0) {
+        // Wait for ADC EOC flag
+    }
+    
+    uint32_t val = *adc_data & 0x00000FFF;
+    *adc_ctrl &= ~1; // Reset trigger
+    
+    // Pack sensor frame: type=0xB2, length=4, value=val
+    uint32_t packet = (0xB2 << 24) | (4 << 8) | (val & 0xFF);
+    return packet;
+}`,
+              assembly: `; sensor_read_loop implementation
+sensor_read_loop:
+  entry a1, 32
+  movi a8, 0x60002100
+  l32i a9, a8, 0
+  or a9, a9, 1
+  s32i a9, a8, 0
+.L_ADC_WAIT:
+  l32i a9, a8, 0
+  extui a9, a9, 1, 1
+  beqz a9, .L_ADC_WAIT
+  l32i a9, a8, 4 ; read adc_data
+  extui a9, a9, 0, 12 ; val & 0xFFF
+  l32i a7, a8, 0
+  movi a10, -2
+  and a7, a7, a10
+  s32i a7, a8, 0 ; clear trigger
+  movi a2, 0xB2
+  slli a2, a2, 24
+  movi a7, 4
+  slli a7, a7, 8
+  or a2, a2, a7
+  extui a7, a9, 0, 8
+  or a2, a2, a7
+  retw`
+            },
+            {
+              name: 'log_write',
+              address: hexAddr(0x0f00),
+              size: 48,
+              pseudo_c: `void log_write(const char *msg) {
+    if (msg == NULL) return;
+    printf("[LOG] %s\\n", msg);
+}`,
+              assembly: `; log_write implementation
+log_write:
+  entry a1, 32
+  beqz a2, .L_LOG_RET
+  mov a3, a2
+  l32r a2, .LC_LOG_STR ; "[LOG] %s\\n"
+  call8 printf
+.L_LOG_RET:
+  retw`
+            },
+            {
+              name: 'app_main',
+              address: hexAddr(0x1200),
+              size: 180,
+              pseudo_c: `void app_main() {
     system_init();
     printf("Binino Handoff active\\n");
     
@@ -251,7 +445,54 @@ void app_main() {
     } else {
         log_write("Fatal interrupt caught in task queue");
     }
-}`
+}`,
+              assembly: `; app_main implementation
+app_main:
+  entry a1, 32
+  call8 system_init
+  l32r a2, .LC_MAIN_STR ; "Binino Handoff active\\n"
+  call8 printf
+  l32r a2, .LC_SSID ; "Binino_AP"
+  l32r a3, .LC_PASS ; "12345678"
+  call8 wifi_connect_ap
+  bnez a2, .L_MAIN_FAIL
+  l32r a2, .LC_OK_STR ; "WiFi Connection established successfully\\n"
+  call8 printf
+.L_MAIN_LOOP:
+  call8 sensor_read_loop
+  call8 process_packet
+  movi a2, 100
+  call8 vTaskDelay
+  j .L_MAIN_LOOP
+.L_MAIN_FAIL:
+  l32r a2, .LC_ERR_STR2 ; "Fatal interrupt caught in task queue"
+  call8 log_write
+  retw`
+            }
+          ],
+          strings: [
+            { address: hexAddr(0x1000), value: 'Device initialized in bootloader mode', encoding: 'ASCII' },
+            { address: hexAddr(0x1040), value: 'Attempting WiFi connect to: %s', encoding: 'ASCII' },
+            { address: hexAddr(0x1080), value: 'Binino_AP', encoding: 'ASCII' },
+            { address: hexAddr(0x10c0), value: '12345678', encoding: 'ASCII' },
+            { address: hexAddr(0x1100), value: 'Fatal interrupt caught in task queue', encoding: 'ASCII' },
+            { address: hexAddr(0x1140), value: '[LOG] %s', encoding: 'ASCII' },
+            { address: hexAddr(0x1180), value: 'Binino Handoff active', encoding: 'ASCII' },
+            { address: hexAddr(0x11c0), value: 'WiFi Connection established successfully', encoding: 'ASCII' }
+          ],
+          symbols: [
+            { address: hexAddr(0x0000), name: '_start', type: 'Code' },
+            { address: hexAddr(0x0010), name: 'ROM_Vector_Table', type: 'Data' },
+            { address: hexAddr(0x0100), name: 'system_init', type: 'Function' },
+            { address: hexAddr(0x0500), name: 'wifi_connect_ap', type: 'Function' },
+            { address: hexAddr(0x0900), name: 'process_packet', type: 'Function' },
+            { address: hexAddr(0x0d00), name: 'sensor_read_loop', type: 'Function' },
+            { address: hexAddr(0x0f00), name: 'log_write', type: 'Function' },
+            { address: hexAddr(0x1200), name: 'app_main', type: 'Function' },
+            { address: hexAddr(0x1500), name: 'esp_heap_alloc', type: 'Function' },
+            { address: hexAddr(0x1600), name: 'vTaskDelay', type: 'Function' },
+            { address: hexAddr(0x1700), name: 'sensor_isr', type: 'Function' }
+          ]
         });
         
         appendLog('INFO', 'Handoff processing complete. Mock pseudo-C files compiled.');
