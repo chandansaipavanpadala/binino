@@ -13,7 +13,7 @@ const faqData = [
   },
   {
     q: 'What microcontrollers can I connect?',
-    a: 'Binino supports ESP32 (WROOM/WROVER), ESP8266 (NodeMCU), ARM Cortex-M (STM32/NXP), AVR/ATmega (Arduino), and RISC-V (CH32/ESP32-C3). The flash extraction protocol is currently optimized for Espressif chips; other architectures use stub protocols.',
+    a: 'Binino supports ESP32 (WROOM/WROVER), ESP8266 (NodeMCU), Raspberry Pi Pico (RP2040), ARM Cortex-M (STM32/NXP), AVR/ATmega (Arduino), and RISC-V (CH32/ESP32-C3). The flash extraction protocol is currently optimized for Espressif chips; other architectures use stub protocols.',
   },
   {
     q: 'Do I need to install any software?',

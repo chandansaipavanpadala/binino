@@ -16,7 +16,7 @@ const LandingPage: React.FC = () => {
     {
       icon: <Zap className="h-5 w-5" />,
       title: 'Hardware Bridge',
-      description: 'Connect directly to ESP32, ARM Cortex, AVR, and RISC-V microcontrollers via Web Serial for real-time firmware extraction.',
+      description: 'Connect directly to ESP32, Raspberry Pi Pico, ARM Cortex, AVR, and RISC-V microcontrollers via Web Serial for real-time firmware extraction.',
     },
     {
       icon: <Shield className="h-5 w-5" />,

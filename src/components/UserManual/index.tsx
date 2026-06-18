@@ -31,7 +31,7 @@ Backend (Local Server):
 
 Hardware:
 • USB cable (Type-A to Micro-USB or USB-C depending on your dev board)
-• Supported microcontroller: ESP32, ESP8266, ARM Cortex-M, AVR, or RISC-V`,
+• Supported microcontroller: ESP32, ESP8266, Raspberry Pi Pico (RP2040), ARM Cortex-M, AVR, or RISC-V`,
   },
   {
     id: 'installation',
@@ -61,7 +61,7 @@ Hardware:
     id: 'connecting',
     title: 'Connecting a Device',
     content: `1. Open Binino in Chrome/Edge and navigate to the Dashboard.
-2. Select your microcontroller architecture from the dropdown (ESP32, ESP8266, ARM Cortex-M, AVR, or RISC-V).
+2. Select your microcontroller architecture from the dropdown (ESP32, ESP8266, Raspberry Pi Pico (RP2040), ARM Cortex-M, AVR, or RISC-V).
 3. Select the baud rate (115200 is the default for most ESP devices).
 4. Click "Establish Bridge" — a browser dialog will prompt you to select a COM/serial port.
 5. Grant permission to the selected port.

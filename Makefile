@@ -11,7 +11,7 @@ build:
 	npm run build
 
 server:
-	cd server && python -m uvicorn main:app --port 8000
+	python -m uvicorn server.main:app --port 8000 --reload
 
 clean:
 	rm -rf dist node_modules server/__pycache__
