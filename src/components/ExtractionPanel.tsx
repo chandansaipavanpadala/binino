@@ -16,6 +16,8 @@ interface ExtractionPanelProps {
   startExtraction: (arch: string, targetSize: number) => Promise<void>;
   flashBuffer: Uint8Array | null;
   isBrowserSupported?: boolean;
+  isExpanded: boolean;
+  onToggle: () => void;
 }
 
 export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
@@ -31,8 +33,11 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
   startExtraction,
   flashBuffer,
   isBrowserSupported = true,
+  isExpanded,
+  onToggle,
 }) => {
   const [selectedSize, setSelectedSize] = useState<number>(0x400000); // Default 4MB
+  const isCollapsed = !isExpanded;
 
   // ETA and Speed calculations state
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -138,11 +143,12 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
 
   return (
     <div 
-      className="rounded-lg p-5 flex flex-col space-y-4 bg-[#111111]"
+      className="rounded-lg p-5 flex flex-col bg-[#111111]"
       style={{ border: '1px solid var(--border-subtle)' }}
     >
       <div 
-        className="flex items-center justify-between pb-3"
+        onClick={onToggle}
+        className="flex items-center justify-between cursor-pointer select-none pb-3"
         style={{ borderBottom: '1px solid var(--border-subtle)' }}
       >
         <div className="flex items-center space-x-2">
@@ -152,150 +158,185 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
           </h2>
         </div>
         
-        {/* Status Badge */}
-        <span 
-          className={`px-2 py-0.5 text-[9px] font-mono font-medium uppercase tracking-wider rounded border ${badge.class}`}
-          style={badge.style}
-        >
-          {badge.label}
-        </span>
-      </div>
-
-      {/* Select Flash size */}
-      <div className="flex flex-col space-y-1.5">
-        <label htmlFor="flash-size" className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-          Target Flash Memory Size
-        </label>
-        <select
-          id="flash-size"
-          value={selectedSize}
-          onChange={(e) => setSelectedSize(Number(e.target.value))}
-          disabled={isRunning}
-          className="w-full h-9 px-3 py-1.5 rounded text-xs font-sans text-[#F0F0F0] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 focus:outline-none"
-          style={{
-            backgroundColor: 'var(--bg-inset)',
-            border: '1px solid var(--border-default)',
-          }}
-        >
-          {sizeOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Control Buttons */}
-      <div className="flex flex-col space-y-2">
-        {!isRunning ? (
-          <div
-            title={!isBrowserSupported ? "Web Serial API is not supported in this browser. Please use Chrome, Edge, or Opera." : undefined}
-            className="w-full"
+        <div className="flex items-center space-x-3">
+          {/* Status Badge */}
+          <span 
+            className={`px-2 py-0.5 text-[9px] font-mono font-medium uppercase tracking-wider rounded border ${badge.class}`}
+            style={badge.style}
           >
-            <button
-              onClick={() => startExtraction(selectedArch, selectedSize)}
-              disabled={isExtractDisabled}
-              className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+            {badge.label}
+          </span>
+
+          {/* Collapse/Expand Toggle chevron trigger */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            className="p-1 rounded hover:bg-[#222222] transition-colors duration-150"
+            style={{ color: 'var(--text-secondary)' }}
+            title={isCollapsed ? "Expand Flash Extractor" : "Collapse Flash Extractor"}
+            aria-label={isCollapsed ? "Expand panel" : "Collapse panel"}
+          >
+            <svg 
+              className={`w-3.5 h-3.5 transition-transform duration-200 ${isCollapsed ? 'rotate-180' : ''}`} 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2.5" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div
+        className="transition-all duration-300 ease-in-out overflow-hidden"
+        style={{
+          maxHeight: isCollapsed ? '0px' : '500px',
+          opacity: isCollapsed ? 0 : 1,
+          pointerEvents: isCollapsed ? 'none' : 'auto',
+        }}
+      >
+        <div className="pt-4 space-y-4">
+          {/* Select Flash size */}
+          <div className="flex flex-col space-y-1.5">
+            <label htmlFor="flash-size" className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+              Target Flash Memory Size
+            </label>
+            <select
+              id="flash-size"
+              value={selectedSize}
+              onChange={(e) => setSelectedSize(Number(e.target.value))}
+              disabled={isRunning}
+              className="w-full h-9 px-3 py-1.5 rounded text-xs font-sans text-[#F0F0F0] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 focus:outline-none"
               style={{
-                backgroundColor: isExtractDisabled ? 'var(--bg-elevated)' : 'var(--accent)',
-                color: isExtractDisabled ? 'var(--text-muted)' : 'var(--bg-base)',
-                border: isExtractDisabled ? '1px solid var(--border-subtle)' : 'none',
+                backgroundColor: 'var(--bg-inset)',
+                border: '1px solid var(--border-default)',
               }}
             >
-              <Download className="h-3.5 w-3.5" />
-              <span>Extract Firmware</span>
-            </button>
+              {sizeOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
-        ) : (
-          <button
-            onClick={cancelExtraction}
-            className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded transition-all duration-150"
-            style={{
-              border: '1px solid var(--status-error)',
-              color: 'var(--status-error)',
-              backgroundColor: 'rgba(248, 113, 113, 0.05)',
-            }}
-          >
-            <XCircle className="h-3.5 w-3.5" />
-            <span>Cancel Extraction</span>
-          </button>
-        )}
 
-        {/* Download Trigger */}
-        {extractionStatus === 'done' && (
-          <button
-            onClick={downloadBin}
-            className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded transition-all duration-150 hover:opacity-90"
-            style={{
-              backgroundColor: 'var(--status-live)',
-              color: 'var(--bg-base)',
-            }}
-          >
-            <Download className="h-3.5 w-3.5" />
-            <span>Download binino_image.bin</span>
-          </button>
-        )}
-
-        {/* Offer partial download on error if there's partial data */}
-        {extractionStatus === 'error' && flashBuffer && bytesRead > 0 && (
-          <button
-            onClick={downloadBin}
-            className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded transition-all duration-150 hover:opacity-90"
-            style={{
-              border: '1px solid var(--status-warn)',
-              color: 'var(--status-warn)',
-              backgroundColor: 'rgba(245, 158, 11, 0.05)',
-            }}
-          >
-            <Download className="h-3.5 w-3.5" />
-            <span>Download Partial Backup ({Math.round(bytesRead / 1024)}KB)</span>
-          </button>
-        )}
-      </div>
-
-      {/* Progress Bar Indicators */}
-      {isRunning && (
-        <div className="space-y-3 pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-          {/* Progress fill */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-[10px] font-sans">
-              <span style={{ color: 'var(--text-secondary)' }}>Progress</span>
-              <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{progressPercent}%</span>
-            </div>
-            <div className="w-full h-1.5 rounded overflow-hidden" style={{ backgroundColor: 'var(--bg-inset)' }}>
+          {/* Control Buttons */}
+          <div className="flex flex-col space-y-2">
+            {!isRunning ? (
               <div
-                className="h-full transition-all duration-150"
-                style={{ 
-                  width: `${progressPercent}%`,
-                  backgroundColor: 'var(--accent)',
+                title={!isBrowserSupported ? "Web Serial API is not supported in this browser. Please use Chrome, Edge, or Opera." : undefined}
+                className="w-full"
+              >
+                <button
+                  onClick={() => startExtraction(selectedArch, selectedSize)}
+                  disabled={isExtractDisabled}
+                  className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: isExtractDisabled ? 'var(--bg-elevated)' : 'var(--accent)',
+                    color: isExtractDisabled ? 'var(--text-muted)' : 'var(--bg-base)',
+                    border: isExtractDisabled ? '1px solid var(--border-subtle)' : 'none',
+                  }}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Extract Firmware</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={cancelExtraction}
+                className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded transition-all duration-150"
+                style={{
+                  border: '1px solid var(--status-error)',
+                  color: 'var(--status-error)',
+                  backgroundColor: 'rgba(248, 113, 113, 0.05)',
                 }}
-              ></div>
-            </div>
+              >
+                <XCircle className="h-3.5 w-3.5" />
+                <span>Cancel Extraction</span>
+              </button>
+            )}
+
+            {/* Download Trigger */}
+            {extractionStatus === 'done' && (
+              <button
+                onClick={downloadBin}
+                className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded transition-all duration-150 hover:opacity-90"
+                style={{
+                  backgroundColor: 'var(--status-live)',
+                  color: 'var(--bg-base)',
+                }}
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>Download binino_image.bin</span>
+              </button>
+            )}
+
+            {/* Offer partial download on error if there's partial data */}
+            {extractionStatus === 'error' && flashBuffer && bytesRead > 0 && (
+              <button
+                onClick={downloadBin}
+                className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded transition-all duration-150 hover:opacity-90"
+                style={{
+                  border: '1px solid var(--status-warn)',
+                  color: 'var(--status-warn)',
+                  backgroundColor: 'rgba(245, 158, 11, 0.05)',
+                }}
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>Download Partial Backup ({Math.round(bytesRead / 1024)}KB)</span>
+              </button>
+            )}
           </div>
 
-          {/* Transfer stats */}
-          <div className="grid grid-cols-3 gap-2 text-[9px] font-mono">
-            <div>
-              <span className="block text-[8px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Retrieved</span>
-              <span className="block truncate" style={{ color: 'var(--text-primary)' }}>
-                {Math.round(bytesRead / 1024)} KB
-              </span>
+          {/* Progress Bar Indicators */}
+          {isRunning && (
+            <div className="space-y-3 pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+              {/* Progress fill */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-[10px] font-sans">
+                  <span style={{ color: 'var(--text-secondary)' }}>Progress</span>
+                  <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{progressPercent}%</span>
+                </div>
+                <div className="w-full h-1.5 rounded overflow-hidden" style={{ backgroundColor: 'var(--bg-inset)' }}>
+                  <div
+                    className="h-full transition-all duration-150"
+                    style={{ 
+                      width: `${progressPercent}%`,
+                      backgroundColor: 'var(--accent)',
+                    }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Transfer stats */}
+              <div className="grid grid-cols-3 gap-2 text-[9px] font-mono">
+                <div>
+                  <span className="block text-[8px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Retrieved</span>
+                  <span className="block truncate" style={{ color: 'var(--text-primary)' }}>
+                    {Math.round(bytesRead / 1024)} KB
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-[8px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Throughput</span>
+                  <span className="block truncate" style={{ color: 'var(--text-primary)' }}>
+                    {extractionStatus === 'reading' ? formatSpeed(speed) : 'Waiting'}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-[8px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>ETA</span>
+                  <span className="block truncate" style={{ color: 'var(--text-primary)' }}>
+                    {extractionStatus === 'reading' ? formatEta(eta) : 'Estimating'}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div>
-              <span className="block text-[8px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Throughput</span>
-              <span className="block truncate" style={{ color: 'var(--text-primary)' }}>
-                {extractionStatus === 'reading' ? formatSpeed(speed) : 'Waiting'}
-              </span>
-            </div>
-            <div>
-              <span className="block text-[8px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>ETA</span>
-              <span className="block truncate" style={{ color: 'var(--text-primary)' }}>
-                {extractionStatus === 'reading' ? formatEta(eta) : 'Estimating'}
-              </span>
-            </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

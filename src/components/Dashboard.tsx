@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Navbar } from './Navbar';
 import { WorkflowStepper } from './WorkflowStepper';
@@ -51,13 +51,34 @@ export const Dashboard: React.FC = () => {
     appendLog,
   } = useAppContext();
 
+  const [expandedPanel, setExpandedPanel] = useState<'hardware' | 'extractor' | 'device' | 'decompiler' | null>('hardware');
+
+  const togglePanel = (panel: 'hardware' | 'extractor' | 'device' | 'decompiler') => {
+    setExpandedPanel((prev) => (prev === panel ? null : panel));
+  };
+
+  // Auto-expand appropriate panels on state changes
+  useEffect(() => {
+    if (connectionStatus === 'connected') {
+      setExpandedPanel('extractor');
+    } else if (connectionStatus === 'idle') {
+      setExpandedPanel('hardware');
+    }
+  }, [connectionStatus]);
+
+  useEffect(() => {
+    if (extractionStatus === 'done') {
+      setExpandedPanel('decompiler');
+    }
+  }, [extractionStatus]);
+
   return (
-    <div className="min-h-screen bg-[#080808] text-[#F0F0F0] flex flex-col font-sans select-none overflow-hidden">
+    <div className="min-h-screen lg:h-screen bg-[#080808] text-[#F0F0F0] flex flex-col font-sans select-none overflow-hidden">
       {/* 48px height Navbar */}
       <Navbar />
 
       {/* Main Workspace */}
-      <main className="flex-1 flex flex-col p-4 space-y-4 overflow-y-auto">
+      <main className="flex-1 flex flex-col p-4 space-y-4 overflow-y-auto lg:overflow-hidden">
         {/* Workflow Stepper */}
         <WorkflowStepper />
 
@@ -107,6 +128,10 @@ export const Dashboard: React.FC = () => {
               startExtraction={startExtraction}
               flashBuffer={flashBuffer}
               isBrowserSupported={isBrowserSupported}
+              isHardwareExpanded={expandedPanel === 'hardware'}
+              onToggleHardware={() => togglePanel('hardware')}
+              isExtractorExpanded={expandedPanel === 'extractor'}
+              onToggleExtractor={() => togglePanel('extractor')}
             />
 
             <DeviceInfoCard
@@ -115,6 +140,8 @@ export const Dashboard: React.FC = () => {
               selectedArch={selectedArch}
               selectedBaud={selectedBaud}
               connectionTimestamp={connectionTimestamp}
+              isExpanded={expandedPanel === 'device'}
+              onToggle={() => togglePanel('device')}
             />
 
             {/* Handoff Panel: Active when firmware extraction completes or in done state */}
@@ -130,6 +157,8 @@ export const Dashboard: React.FC = () => {
                 cancelHandoff={cancelHandoff}
                 flashSize={flashBuffer ? flashBuffer.length : 0}
                 onOpenExplorer={() => setIsExplorerOpen(true)}
+                isExpanded={expandedPanel === 'decompiler'}
+                onToggle={() => togglePanel('decompiler')}
               />
             )}
           </section>
@@ -139,7 +168,7 @@ export const Dashboard: React.FC = () => {
             <div className="flex-1 flex flex-col min-h-0">
               <TerminalPane logs={terminalLogs} clearLogs={clearLogs} />
             </div>
-            <div className="h-[180px] shrink-0">
+            <div className="shrink-0 w-full">
               <HexPreviewStrip
                 liveBuffer={hexBuffer}
                 flashBuffer={flashBuffer}

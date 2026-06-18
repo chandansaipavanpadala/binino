@@ -14,6 +14,8 @@ interface HandoffPanelProps {
   cancelHandoff: () => void;
   flashSize: number;
   onOpenExplorer?: () => void;
+  isExpanded: boolean;
+  onToggle: () => void;
 }
 
 export const HandoffPanel: React.FC<HandoffPanelProps> = ({
@@ -27,7 +29,10 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
   cancelHandoff,
   flashSize,
   onOpenExplorer,
+  isExpanded,
+  onToggle,
 }) => {
+  const isCollapsed = !isExpanded;
   
   const isIdle = uploadStatus === 'idle';
   const isUploading = uploadStatus === 'uploading';
@@ -109,11 +114,12 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
 
   return (
     <div 
-      className="rounded-lg p-5 flex flex-col space-y-4 bg-[#111111]"
+      className="rounded-lg p-5 flex flex-col bg-[#111111]"
       style={{ border: '1px solid var(--border-subtle)' }}
     >
       <div 
-        className="flex items-center justify-between pb-3"
+        onClick={onToggle}
+        className="flex items-center justify-between cursor-pointer select-none pb-3"
         style={{ borderBottom: '1px solid var(--border-subtle)' }}
       >
         <div className="flex items-center space-x-2">
@@ -122,15 +128,47 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
             Decompiler Handoff
           </h2>
         </div>
-        {isProcessing && (
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: 'var(--accent)' }}></span>
-            <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: 'var(--accent)' }}></span>
-          </span>
-        )}
+        <div className="flex items-center space-x-3">
+          {isProcessing && (
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: 'var(--accent)' }}></span>
+              <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: 'var(--accent)' }}></span>
+            </span>
+          )}
+
+          {/* Collapse/Expand Toggle chevron trigger */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            className="p-1 rounded hover:bg-[#222222] transition-colors duration-150"
+            style={{ color: 'var(--text-secondary)' }}
+            title={isCollapsed ? "Expand Decompiler Handoff" : "Collapse Decompiler Handoff"}
+            aria-label={isCollapsed ? "Expand panel" : "Collapse panel"}
+          >
+            <svg 
+              className={`w-3.5 h-3.5 transition-transform duration-200 ${isCollapsed ? 'rotate-180' : ''}`} 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2.5" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+            </svg>
+          </button>
+        </div>
       </div>
 
-      <div className="space-y-4">
+      <div
+        className="transition-all duration-300 ease-in-out overflow-hidden"
+        style={{
+          maxHeight: isCollapsed ? '0px' : '600px',
+          opacity: isCollapsed ? 0 : 1,
+          pointerEvents: isCollapsed ? 'none' : 'auto',
+        }}
+      >
+        <div className="pt-4 space-y-4">
         {/* Main Handoff Action Trigger */}
         {!isProcessing ? (
           <button
@@ -325,6 +363,7 @@ export const HandoffPanel: React.FC<HandoffPanelProps> = ({
         )}
       </div>
     </div>
+  </div>
   );
 };
 

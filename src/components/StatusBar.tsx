@@ -59,7 +59,7 @@ export const StatusBar: React.FC = () => {
       </div>
 
       {/* Right: version */}
-      <span>Binino v1.0.0</span>
+      <span>BININO v1.0.0</span>
     </div>
   );
 };

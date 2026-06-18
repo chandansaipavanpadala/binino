@@ -38,8 +38,8 @@ const LandingPage: React.FC = () => {
           <div className="p-1.5 rounded" style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
             <Cpu className="h-4 w-4" style={{ color: 'var(--accent)' }} />
           </div>
-          <span className="text-lg font-semibold tracking-tight" style={{ fontFamily: 'var(--font-ui)' }}>
-            Binino<span style={{ color: 'var(--text-muted)' }}>.</span>
+          <span className="text-lg font-bold tracking-wider" style={{ fontFamily: 'var(--font-ui)' }}>
+            BININO<span style={{ color: 'var(--text-muted)' }}>.</span>
           </span>
         </div>
 
@@ -60,8 +60,8 @@ const LandingPage: React.FC = () => {
       </nav>
 
       {/* Hero */}
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-20">
-        <div className="max-w-2xl text-center space-y-6">
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-8 md:py-12">
+        <div className="max-w-2xl text-center space-y-4 md:space-y-5">
           {/* Version badge */}
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-[11px] font-mono tracking-wide" style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--status-live)' }}></span>
@@ -69,8 +69,8 @@ const LandingPage: React.FC = () => {
           </div>
 
           {/* Wordmark */}
-          <h1 className="text-5xl md:text-6xl font-semibold tracking-tight leading-tight" style={{ fontFamily: 'var(--font-ui)', color: 'var(--text-primary)' }}>
-            Binino
+          <h1 className="text-5xl md:text-6xl font-extrabold tracking-wider leading-tight" style={{ fontFamily: 'var(--font-ui)', color: 'var(--text-primary)' }}>
+            BININO
           </h1>
 
           {/* Tagline */}
@@ -110,7 +110,7 @@ const LandingPage: React.FC = () => {
         </div>
 
         {/* Feature cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl w-full mt-16 px-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl w-full mt-8 md:mt-10 px-4">
           {features.map((f, i) => (
             <div
               key={i}
@@ -129,7 +129,7 @@ const LandingPage: React.FC = () => {
 
       {/* Footer (inline on landing) */}
       <footer className="py-4 px-6 flex items-center justify-between text-[10px]" style={{ borderTop: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
-        <span>Binino v1.0.0</span>
+        <span>BININO v1.0.0</span>
         <span>Built by Chandan Sai Pavan Padala</span>
         <a href="https://github.com/chandansaipavanpadala/binino" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-1 hover:opacity-80 transition-opacity" style={{ color: 'var(--text-muted)' }}>
           <Github className="h-3 w-3" />

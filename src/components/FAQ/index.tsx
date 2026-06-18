@@ -4,16 +4,16 @@ import { ChevronDown, ArrowLeft, HelpCircle } from 'lucide-react';
 
 const faqData = [
   {
-    q: 'What is Binino?',
-    a: 'Binino is a browser-based firmware extraction and reverse-engineering toolkit. It connects to microcontrollers via USB using the Web Serial API, extracts raw flash memory, decompiles it using Ghidra headless analysis, and presents the results in an IDE-style code explorer with AI-powered explanations.',
+    q: 'What is BININO?',
+    a: 'BININO is a browser-based firmware extraction and reverse-engineering toolkit. It connects to microcontrollers via USB using the Web Serial API, extracts raw flash memory, decompiles it using Ghidra headless analysis, and presents the results in an IDE-style code explorer with AI-powered explanations.',
   },
   {
     q: 'Which browsers are supported?',
-    a: 'Binino requires a browser that supports the Web Serial API. Currently, Google Chrome (v89+), Microsoft Edge (v89+), and Opera (v76+) are supported. Firefox and Safari do not support Web Serial. Demo Mode works in all modern browsers.',
+    a: 'BININO requires a browser that supports the Web Serial API. Currently, Google Chrome (v89+), Microsoft Edge (v89+), and Opera (v76+) are supported. Firefox and Safari do not support Web Serial. Demo Mode works in all modern browsers.',
   },
   {
     q: 'What microcontrollers can I connect?',
-    a: 'Binino supports ESP32 (WROOM/WROVER), ESP8266 (NodeMCU), Raspberry Pi Pico (RP2040), ARM Cortex-M (STM32/NXP), AVR/ATmega (Arduino), and RISC-V (CH32/ESP32-C3). The flash extraction protocol is currently optimized for Espressif chips; other architectures use stub protocols.',
+    a: 'BININO supports ESP32 (WROOM/WROVER), ESP8266 (NodeMCU), Raspberry Pi Pico (RP2040), ARM Cortex-M (STM32/NXP), AVR/ATmega (Arduino), and RISC-V (CH32/ESP32-C3). The flash extraction protocol is currently optimized for Espressif chips; other architectures use stub protocols.',
   },
   {
     q: 'Do I need to install any software?',
@@ -40,8 +40,8 @@ const faqData = [
     a: 'AI Explain sends the pseudo-C code of a selected function to the Anthropic Claude API and streams back a plain-English explanation of what the firmware function does. This requires an ANTHROPIC_API_KEY configured in the backend .env file.',
   },
   {
-    q: 'Is Binino open source?',
-    a: 'Yes. Binino is fully open-source and available on GitHub at github.com/chandansaipavanpadala/binino. Contributions, issues, and pull requests are welcome.',
+    q: 'Is BININO open source?',
+    a: 'Yes. BININO is fully open-source and available on GitHub at github.com/chandansaipavanpadala/binino. Contributions, issues, and pull requests are welcome.',
   },
 ];
 
@@ -105,7 +105,7 @@ export const FAQ: React.FC = () => {
       {/* Content */}
       <main className="flex-1 max-w-2xl w-full mx-auto px-6 py-10">
         <p className="text-sm mb-8" style={{ color: 'var(--text-secondary)' }}>
-          Common questions about Binino's hardware bridge, firmware extraction pipeline, Ghidra decompilation, and deployment.
+          Common questions about BININO's hardware bridge, firmware extraction pipeline, Ghidra decompilation, and deployment.
         </p>
 
         <div>

@@ -36,7 +36,12 @@ app = FastAPI(
 )
 
 # CORS Configurations
-allowed_origins = ["http://localhost:5173"]  # Dev default
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]  # Dev defaults
 env_origins = os.environ.get("BININO_ALLOWED_ORIGINS")
 if env_origins:
     allowed_origins = [origin.strip() for origin in env_origins.split(",") if origin.strip()]

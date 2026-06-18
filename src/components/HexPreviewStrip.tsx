@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ExtractionStatus } from '../hooks/useFlashExtractor';
-import { ChevronDown, ChevronUp, Binary } from 'lucide-react';
+import { ChevronDown, ChevronUp, Binary, Lock } from 'lucide-react';
 
 interface HexPreviewStripProps {
   liveBuffer: Uint8Array;
@@ -15,6 +15,16 @@ export const HexPreviewStrip: React.FC<HexPreviewStripProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [previewMode, setPreviewMode] = useState<'live' | 'flash'>('live');
+
+  // Hex preview is locked until extraction completes
+  const isLocked = extractionStatus !== 'done';
+
+  // Force collapse if locked (e.g. during an active extraction run)
+  useEffect(() => {
+    if (isLocked) {
+      setIsExpanded(false);
+    }
+  }, [isLocked]);
 
   // Select active buffer based on mode selection
   const buffer = previewMode === 'live' ? liveBuffer : (flashBuffer || new Uint8Array(0));
@@ -73,29 +83,50 @@ export const HexPreviewStrip: React.FC<HexPreviewStripProps> = ({
 
   return (
     <div 
-      className="rounded-lg overflow-hidden flex flex-col bg-[#111111]"
+      className="rounded-xl overflow-hidden flex flex-col bg-[#111111]"
       style={{ border: '1px solid var(--border-subtle)' }}
     >
       {/* Toggle Bar */}
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex flex-col sm:flex-row sm:items-center justify-between px-4 py-2.5 transition-colors space-y-2 sm:space-y-0"
+        onClick={() => {
+          if (!isLocked) {
+            setIsExpanded(!isExpanded);
+          }
+        }}
+        disabled={isLocked}
+        className={`w-full flex flex-col sm:flex-row sm:items-center justify-between px-4 py-2.5 transition-all duration-200 space-y-2 sm:space-y-0 ${
+          isLocked ? 'opacity-60 cursor-not-allowed' : 'hover:bg-[#1A1A1A]'
+        }`}
         style={{ 
           backgroundColor: 'var(--bg-surface)',
           borderBottom: isExpanded ? '1px solid var(--border-subtle)' : 'none'
         }}
+        title={isLocked ? "HEX Buffer Preview is locked until firmware extraction completes" : "Toggle HEX Buffer Preview"}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <Binary className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
-          <span className="text-xs font-semibold tracking-wider uppercase" style={{ color: 'var(--text-secondary)' }}>
+          {isLocked ? (
+            <Lock className="h-3.5 w-3.5 text-amber-500/80" />
+          ) : (
+            <Binary className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
+          )}
+          <span 
+            className="text-xs font-semibold tracking-wider uppercase flex items-center" 
+            style={{ color: isLocked ? 'var(--text-muted)' : 'var(--text-secondary)' }}
+          >
             HEX Buffer Preview
+            {isLocked && (
+              <span className="text-[9px] text-amber-500/70 lowercase font-mono font-normal normal-case italic ml-2">
+                (locked during extraction)
+              </span>
+            )}
           </span>
           <span 
             className="text-[9px] font-mono px-2 py-0.5 rounded-full"
             style={{ 
               backgroundColor: 'var(--bg-inset)', 
-              color: 'var(--accent)',
-              border: '1px solid var(--border-subtle)'
+              color: isLocked ? 'var(--text-muted)' : 'var(--accent)',
+              border: '1px solid var(--border-subtle)',
+              opacity: isLocked ? 0.6 : 1
             }}
           >
             {buffer.length} bytes
@@ -106,15 +137,17 @@ export const HexPreviewStrip: React.FC<HexPreviewStripProps> = ({
             className="flex p-0.5 rounded ml-0 sm:ml-2"
             style={{ 
               backgroundColor: 'var(--bg-inset)',
-              border: '1px solid var(--border-subtle)'
+              border: '1px solid var(--border-subtle)',
+              opacity: isLocked ? 0.5 : 1
             }}
           >
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setPreviewMode('live');
+                if (!isLocked) setPreviewMode('live');
               }}
-              className="px-2 py-0.5 text-[9px] font-sans font-bold tracking-wider uppercase rounded transition-all duration-150"
+              disabled={isLocked}
+              className="px-2 py-0.5 text-[9px] font-sans font-bold tracking-wider uppercase rounded transition-all duration-150 disabled:cursor-not-allowed"
               style={{
                 backgroundColor: previewMode === 'live' ? 'var(--bg-elevated)' : 'transparent',
                 color: previewMode === 'live' ? 'var(--text-primary)' : 'var(--text-muted)'
@@ -125,9 +158,9 @@ export const HexPreviewStrip: React.FC<HexPreviewStripProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setPreviewMode('flash');
+                if (!isLocked) setPreviewMode('flash');
               }}
-              disabled={extractionStatus !== 'done'}
+              disabled={isLocked || extractionStatus !== 'done'}
               className="px-2 py-0.5 text-[9px] font-sans font-bold tracking-wider uppercase rounded transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed"
               style={{
                 backgroundColor: previewMode === 'flash' ? 'var(--bg-elevated)' : 'transparent',
@@ -140,21 +173,34 @@ export const HexPreviewStrip: React.FC<HexPreviewStripProps> = ({
           </div>
         </div>
         <div className="flex items-center space-x-2 self-end sm:self-auto">
-          {isExpanded && (
-            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-              {previewMode === 'live' ? 'Showing last 1KB' : 'Showing last 4KB'}
-            </span>
-          )}
-          {isExpanded ? (
-            <ChevronUp className="h-4 w-4" style={{ color: 'var(--text-secondary)' }} />
+          {isLocked ? (
+            <span className="text-[9px] font-mono uppercase tracking-wider text-amber-500/70">Locked</span>
           ) : (
-            <ChevronDown className="h-4 w-4" style={{ color: 'var(--text-secondary)' }} />
+            <>
+              {isExpanded && (
+                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  {previewMode === 'live' ? 'Showing last 1KB' : 'Showing last 4KB'}
+                </span>
+              )}
+              {isExpanded ? (
+                <ChevronUp className="h-4 w-4" style={{ color: 'var(--text-secondary)' }} />
+              ) : (
+                <ChevronDown className="h-4 w-4" style={{ color: 'var(--text-secondary)' }} />
+              )}
+            </>
           )}
         </div>
       </button>
 
       {/* HEX Content Panel */}
-      {isExpanded && (
+      <div 
+        className="transition-all duration-300 ease-in-out overflow-hidden"
+        style={{
+          maxHeight: isExpanded ? '256px' : '0px',
+          opacity: isExpanded ? 1 : 0,
+          pointerEvents: isExpanded ? 'auto' : 'none',
+        }}
+      >
         <div 
           className="p-4 h-64 overflow-y-auto font-mono text-[10px] leading-5 select-text"
           style={{ backgroundColor: 'var(--bg-inset)' }}
@@ -222,7 +268,7 @@ export const HexPreviewStrip: React.FC<HexPreviewStripProps> = ({
             </div>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

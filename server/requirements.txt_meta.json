@@ -1,0 +1,15 @@
+{
+  "entry_point": "0x0",
+  "functions": [
+    "Reset",
+    "UndefinedInstruction",
+    "PrefetchAbort",
+    "DataAbort",
+    "NotUsed",
+    "IRQ",
+    "FIQ"
+  ],
+  "strings": ["Binino Decoded firmware"],
+  "symbols": ["_start"],
+  "assembly": "// Headless decompilation assembly preview"
+}

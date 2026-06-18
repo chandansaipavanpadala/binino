@@ -23,8 +23,8 @@ export const Navbar: React.FC = () => {
         >
           <Cpu className="h-4 w-4" style={{ color: 'var(--accent)' }} />
         </div>
-        <span className="text-sm font-semibold tracking-tight font-sans text-[#F0F0F0]">
-          Binino<span style={{ color: 'var(--text-muted)' }}>.</span>
+        <span className="text-sm font-bold tracking-wider font-sans text-[#F0F0F0]">
+          BININO<span style={{ color: 'var(--text-muted)' }}>.</span>
         </span>
         <span
           className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded-full bg-[#1A1A1A] text-[#888888]"

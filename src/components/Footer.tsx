@@ -15,8 +15,8 @@ export const Footer: React.FC = () => {
       }}
     >
       <div className="flex items-center space-x-3">
-        <span className="font-semibold tracking-tight" style={{ color: 'var(--text-secondary)' }}>
-          Binino
+        <span className="font-bold tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+          BININO
         </span>
         <span
           className="px-1.5 py-0.5 rounded text-[9px] font-mono"

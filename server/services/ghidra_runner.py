@@ -17,7 +17,8 @@ ARCH_MAP = {
     "avr": "AVR8:LE:16:default",
     "arm": "ARM:LE:32:v7",
     "cortex": "ARM:LE:32:v7",
-    "riscv": "RISCV:LE:32:RV32G"
+    "riscv": "RISCV:LE:32:RV32G",
+    "rp2040": "ARM:LE:32:v6"
 }
 
 class GhidraRunner:
@@ -86,7 +87,8 @@ class GhidraRunner:
                 "avr": "0x00000000",
                 "arm": "0x08000000",
                 "cortex": "0x08000000",
-                "riscv": "0x00010000"
+                "riscv": "0x00010000",
+                "rp2040": "0x10000000"
             }.get(arch, "0x00000000")
 
             mock_asm = {
@@ -94,10 +96,11 @@ class GhidraRunner:
                 "esp8266": "entry app_main:\n  movi a2, 0x3FFFC000\n  l32i a3, a2, 0\n  ret.n",
                 "avr": "00000000 <main>:\n  ldi r16, 0xFF\n  out 0x0A, r16\n  out 0x0B, r16\n  rjmp .-2",
                 "cortex": "08000000 <main>:\n  push {r7, lr}\n  add r7, sp, #0\n  bl system_init\n  movs r0, #0\n  pop {r7, pc}",
-                "riscv": "00010000 <main>:\n  addi sp, sp, -16\n  sw ra, 12(sp)\n  jal ra, system_init\n  li a0, 0\n  lw ra, 12(sp)\n  jalr zero, 0(ra)"
+                "riscv": "00010000 <main>:\n  addi sp, sp, -16\n  sw ra, 12(sp)\n  jal ra, system_init\n  li a0, 0\n  lw ra, 12(sp)\n  jalr zero, 0(ra)",
+                "rp2040": "10000000 <main>:\n  push {r7, lr}\n  add r7, sp, #0\n  bl system_init\n  movs r0, #0\n  pop {r7, pc}"
             }.get(arch, "nop")
 
-            base_addr = 0x40080000 if arch == "esp32" else 0x08000000
+            base_addr = 0x40080000 if arch == "esp32" else (0x10000000 if arch == "rp2040" else 0x08000000)
             def hex_addr(offset):
                 return f"0x{(base_addr + offset):08x}"
 
@@ -397,6 +400,7 @@ app_main:
             project_name,
             "-import", str(filepath),
             "-processor", processor,
+            "-scriptPath", str(Path(__file__).parent.parent),
             "-postScript", "ExportDecompiled.java",
             "-deleteProject"
         ]
@@ -411,64 +415,86 @@ app_main:
             }
         }
 
+        import subprocess
+        import threading
+
+        # Use an asyncio Queue to pass lines from the reader thread to the async generator
+        line_queue = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+
+        def reader_thread():
+            try:
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,  # Line-buffered
+                    errors='ignore'
+                )
+                # Read stdout line by line
+                for line in process.stdout:
+                    loop.call_soon_threadsafe(line_queue.put_nowait, ("line", line))
+                process.wait()
+                loop.call_soon_threadsafe(line_queue.put_nowait, ("done", process.returncode))
+            except Exception as thread_ex:
+                loop.call_soon_threadsafe(line_queue.put_nowait, ("error", thread_ex))
+
+        # Start reader thread in the background
+        threading.Thread(target=reader_thread, daemon=True).start()
+
+        # Read events from the queue asynchronously
         try:
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT
-            )
-            
-            # Read stdout line by line
             while True:
-                line_bytes = await process.stdout.readline()
-                if not line_bytes:
+                msg_type, val = await line_queue.get()
+                if msg_type == "line":
+                    line = val.strip()
+                    logger.debug(f"Ghidra: {line}")
+
+                    # Map log tags to progress estimates
+                    if "REPORT: Import" in line:
+                        yield {
+                            "event": "status",
+                            "data": {
+                                "stage": "Import",
+                                "message": "Microcontroller binary image imported successfully.",
+                                "percent": 15
+                            }
+                        }
+                    elif "REPORT: Auto Analysis" in line:
+                        yield {
+                            "event": "status",
+                            "data": {
+                                "stage": "Auto Analysis",
+                                "message": "Running basic blocks, calls analysis, and cross-references...",
+                                "percent": 40
+                            }
+                        }
+                    elif "Decompiling functions" in line or "Decompiling" in line:
+                        yield {
+                            "event": "status",
+                            "data": {
+                                "stage": "Decompiling",
+                                "message": "Running decompilation analyzer and recovering AST constructs...",
+                                "percent": 70
+                            }
+                        }
+                    elif "REPORT: Export" in line:
+                        yield {
+                            "event": "status",
+                            "data": {
+                                "stage": "Exporting",
+                                "message": "Writing decompiled output files to job workspace...",
+                                "percent": 90
+                            }
+                        }
+                elif msg_type == "done":
+                    returncode = val
+                    if returncode != 0:
+                        raise Exception(f"Ghidra execution returned error code: {returncode}")
                     break
-                
-                line = line_bytes.decode('utf-8', errors='ignore').strip()
-                logger.debug(f"Ghidra: {line}")
-
-                # Map log tags to progress estimates
-                if "REPORT: Import" in line:
-                    yield {
-                        "event": "status",
-                        "data": {
-                            "stage": "Import",
-                            "message": "Microcontroller binary image imported successfully.",
-                            "percent": 15
-                        }
-                    }
-                elif "REPORT: Auto Analysis" in line:
-                    yield {
-                        "event": "status",
-                        "data": {
-                            "stage": "Auto Analysis",
-                            "message": "Running basic blocks, calls analysis, and cross-references...",
-                            "percent": 40
-                        }
-                    }
-                elif "Decompiling functions" in line or "Decompiling" in line:
-                    yield {
-                        "event": "status",
-                        "data": {
-                            "stage": "Decompiling",
-                            "message": "Running decompilation analyzer and recovering AST constructs...",
-                            "percent": 70
-                        }
-                    }
-                elif "REPORT: Export" in line:
-                    yield {
-                        "event": "status",
-                        "data": {
-                            "stage": "Exporting",
-                            "message": "Writing decompiled output files to job workspace...",
-                            "percent": 90
-                        }
-                    }
-
-            await process.wait()
-
-            if process.returncode != 0:
-                raise Exception(f"Ghidra execution returned error code: {process.returncode}")
+                elif msg_type == "error":
+                    raise val
 
             # 3. Read output from export files in job_dir
             # ExportDecompiled.java writes decompiled files (e.g. {filename}.c, {filename}_meta.json)
@@ -502,38 +528,66 @@ app_main:
                     logger.warning(f"Error parsing metadata JSON: {ex}")
 
             # Convert simple lists to structured records matching Pydantic schema
-            base_real_addr = 0x40080000 if arch == "esp32" else 0x08000000
             structured_funcs = []
-            for idx, func_name in enumerate(functions):
-                f_pseudo = ""
-                if len(functions) == 1 or func_name == "main" or func_name == "app_main":
-                    f_pseudo = raw_c
-                else:
-                    f_pseudo = f"void {func_name}() {{\n    // Ghidra decompiled block stub\n}}"
-                
-                structured_funcs.append({
-                    "name": func_name,
-                    "address": f"0x{(base_real_addr + idx * 0x100):08x}",
-                    "size": 128,
-                    "pseudo_c": f_pseudo,
-                    "assembly": f"; assembly for {func_name}\nnop"
-                })
+            if functions and isinstance(functions[0], dict):
+                for f_obj in functions:
+                    structured_funcs.append({
+                        "name": f_obj.get("name"),
+                        "address": f_obj.get("address"),
+                        "size": f_obj.get("size", 128),
+                        "pseudo_c": f_obj.get("pseudo_c", ""),
+                        "assembly": f_obj.get("assembly", "")
+                    })
+            else:
+                base_real_addr = 0x40080000 if arch == "esp32" else 0x08000000
+                for idx, func_name in enumerate(functions):
+                    f_pseudo = ""
+                    if len(functions) == 1 or func_name == "main" or func_name == "app_main":
+                        f_pseudo = raw_c
+                    else:
+                        f_pseudo = f"void {func_name}() {{\n    // Ghidra decompiled block stub\n}}"
+                    
+                    structured_funcs.append({
+                        "name": func_name,
+                        "address": f"0x{(base_real_addr + idx * 0x100):08x}",
+                        "size": 128,
+                        "pseudo_c": f_pseudo,
+                        "assembly": f"; assembly for {func_name}\nnop"
+                    })
                 
             structured_strings = []
-            for idx, s in enumerate(strings):
-                structured_strings.append({
-                    "address": f"0x{(base_real_addr + 0x2000 + idx * 0x20):08x}",
-                    "value": s,
-                    "encoding": "ASCII"
-                })
+            if strings and isinstance(strings[0], dict):
+                for s_obj in strings:
+                    structured_strings.append({
+                        "address": s_obj.get("address"),
+                        "value": s_obj.get("value"),
+                        "encoding": s_obj.get("encoding", "ASCII")
+                    })
+            else:
+                base_real_addr = 0x40080000 if arch == "esp32" else 0x08000000
+                for idx, s in enumerate(strings):
+                    structured_strings.append({
+                        "address": f"0x{(base_real_addr + 0x2000 + idx * 0x20):08x}",
+                        "value": s,
+                        "encoding": "ASCII"
+                    })
                 
             structured_symbols = []
-            for idx, sym in enumerate(symbols):
-                structured_symbols.append({
-                    "address": f"0x{(base_real_addr + 0x3000 + idx * 0x10):08x}",
-                    "name": sym,
-                    "type": "Code" if sym == "_start" else "Function"
-                })
+            if symbols and isinstance(symbols[0], dict):
+                for sym_obj in symbols:
+                    structured_symbols.append({
+                        "address": sym_obj.get("address"),
+                        "name": sym_obj.get("name"),
+                        "type": sym_obj.get("type", "Code")
+                    })
+            else:
+                base_real_addr = 0x40080000 if arch == "esp32" else 0x08000000
+                for idx, sym in enumerate(symbols):
+                    structured_symbols.append({
+                        "address": f"0x{(base_real_addr + 0x3000 + idx * 0x10):08x}",
+                        "name": sym,
+                        "type": "Code" if sym == "_start" else "Function"
+                    })
 
             real_result = {
                 "job_id": job_id,

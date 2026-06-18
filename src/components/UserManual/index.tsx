@@ -6,7 +6,7 @@ const sections = [
   {
     id: 'overview',
     title: 'Overview',
-    content: `Binino is a browser-based firmware extraction and reverse-engineering toolkit designed for embedded engineers, security researchers, and hardware enthusiasts. It provides a complete pipeline from physical hardware connection to decompiled code analysis — entirely from a web browser.
+    content: `BININO is a browser-based firmware extraction and reverse-engineering toolkit designed for embedded engineers, security researchers, and hardware enthusiasts. It provides a complete pipeline from physical hardware connection to decompiled code analysis — entirely from a web browser.
 
 The toolkit consists of five integrated phases:
 • Phase 1 — Hardware Bridge: Connect to microcontrollers via USB using the Web Serial API.
@@ -60,7 +60,7 @@ Hardware:
   {
     id: 'connecting',
     title: 'Connecting a Device',
-    content: `1. Open Binino in Chrome/Edge and navigate to the Dashboard.
+    content: `1. Open BININO in Chrome/Edge and navigate to the Dashboard.
 2. Select your microcontroller architecture from the dropdown (ESP32, ESP8266, Raspberry Pi Pico (RP2040), ARM Cortex-M, AVR, or RISC-V).
 3. Select the baud rate (115200 is the default for most ESP devices).
 4. Click "Establish Bridge" — a browser dialog will prompt you to select a COM/serial port.
@@ -80,7 +80,7 @@ Troubleshooting:
 
 1. Select the target flash memory size (1 MB to 16 MB). Most ESP32 modules use 4 MB.
 2. Click "Extract Firmware" to begin the extraction process.
-3. Binino enters bootloader mode by cycling the DTR/RTS pins, then sends the esptool SYNC handshake.
+3. BININO enters bootloader mode by cycling the DTR/RTS pins, then sends the esptool SYNC handshake.
 4. Flash blocks are read in 1024-byte chunks with XOR checksum verification.
 5. Progress is displayed in real-time with throughput speed and ETA.
 6. On completion, the binary is stored in browser memory and the "Download" button becomes available.
@@ -161,7 +161,7 @@ Privacy: Only the selected function's code is sent to the API. The full binary o
   {
     id: 'demo-mode',
     title: 'Demo Mode',
-    content: `Demo Mode allows you to explore the full Binino interface without physical hardware:
+    content: `Demo Mode allows you to explore the full BININO interface without physical hardware:
 
 • Simulates a virtual ESP32 bridge connection
 • Generates realistic mock firmware binary data
@@ -172,7 +172,7 @@ Privacy: Only the selected function's code is sent to the API. The full binary o
 To activate: Click "Demo Mode: ON" in the navbar, or click "Try Demo Mode" on the landing page.
 
 Demo Mode is ideal for:
-• Learning the Binino workflow before connecting real hardware
+• Learning the BININO workflow before connecting real hardware
 • Testing UI changes during development
 • Presentations and demonstrations`,
   },

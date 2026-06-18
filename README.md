@@ -142,7 +142,9 @@ The FastAPI backend exposes the following endpoints:
 
 ## Installation & Setup
 
-### Prerequisites
+### Prerequisites & Requirements
+
+For a complete breakdown of version requirements, library versions, frameworks, and microcontroller support, refer to the [Requirements, Versions, and Frameworks Guide](file:///p:/OneDrive - Amrita vishwa vidyapeetham/ASEB/Projects/binino/requirements.md).
 
 To compile and execute the complete pipeline, your system must have:
 1. **Java Development Kit (JDK)**: OpenJDK 17 or OpenJDK 21 installed.
