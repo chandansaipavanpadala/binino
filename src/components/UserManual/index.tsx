@@ -74,6 +74,23 @@ Troubleshooting:
 • Only one application can access a COM port at a time — close Arduino IDE or other serial monitors.`,
   },
   {
+    id: 'smart-detect',
+    title: 'Smart Runtime Detection & File Browser',
+    content: `BININO v2.0.0 introduces automated Smart Runtime Detection and an interactive File Browser for interpreted environments. 
+
+Smart Runtime Detector:
+When a device bridge is established, the tool automatically sends background command probes (including REPL sequences, Lua triggers, JS queries, and AT sync requests) to identify the running firmware category. 
+
+Classification & Layout Routes:
+• Route A — Interpreted Runtimes: Detects MicroPython, CircuitPython, NodeMCU Lua, or Espruino JS. This opens the interactive File Browser directly, letting you read, inspect, and analyze plain-text source scripts.
+• Route B — Compiled Firmware: Triggered when no runtime is detected. Bypasses the file browser to guide you straight through the standard raw binary firmware extraction and Ghidra analysis.
+• Route C — Bootloader Mode: Detects active bootloader synchronization, skipping probing to launch extraction.
+• Route D — Utilities/AT: Detects shells (RTOS, Forth, TinyBASIC) and routes to a full terminal passthrough.
+
+File Browser & AI Source Explanations:
+The File Browser exposes a collapsible directory tree. Selecting a file displays code with line numbers and syntax highlighting. Clicking 'Explain script' sends the plain-text script to the AI (Claude) to explain hardware peripherals, control loop designs, and potential coding bugs in real-time. You can package and download all files at once as a ZIP archive using JSZip.`,
+  },
+  {
     id: 'extraction',
     title: 'Extracting Firmware',
     content: `Once connected, the Flash Extractor panel becomes active:
@@ -238,22 +255,16 @@ export const UserManual: React.FC = () => {
     setActiveSection(sectionId);
     setIsMobileNavOpen(false);
     
-    // Temporarily disable scroll-spy updates during smooth scroll transition
     isClickScrolling.current = true;
     if (scrollTimeout.current) {
       window.clearTimeout(scrollTimeout.current);
     }
 
     const el = document.getElementById(`section-${sectionId}`);
-    if (el && contentRef.current) {
-      const containerTop = contentRef.current.getBoundingClientRect().top;
-      const elementTop = el.getBoundingClientRect().top;
-      const scrollTarget = contentRef.current.scrollTop + (elementTop - containerTop) - 24;
-      
-      contentRef.current.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // Re-enable scroll spy after the smooth scroll is expected to complete
     scrollTimeout.current = window.setTimeout(() => {
       isClickScrolling.current = false;
     }, 800);
@@ -358,7 +369,7 @@ export const UserManual: React.FC = () => {
         {/* Main content */}
         <div ref={contentRef} className="flex-1 overflow-y-auto px-6 lg:px-12 py-10 space-y-12">
           {sections.map((s) => (
-            <section key={s.id} id={`section-${s.id}`}>
+            <section key={s.id} id={`section-${s.id}`} style={{ scrollMarginTop: '24px' }}>
               <h2
                 className="text-lg font-semibold mb-4 pb-2"
                 style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}

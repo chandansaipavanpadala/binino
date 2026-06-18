@@ -5,6 +5,7 @@ import asyncio
 import time
 from collections import deque
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 from server.models.schemas import ExplainRequest
 from anthropic import AsyncAnthropic
@@ -168,3 +169,166 @@ async def explain_function(request: Request, req: ExplainRequest):
     else:
         logger.info(f"Connecting to Anthropic API to decompile function: {req.function_name}")
         return EventSourceResponse(real_explain_generator(api_key, req))
+
+
+# Runtime-specific system prompts for script source code explanation
+SOURCE_SYSTEM_PROMPTS = {
+    "micropython": (
+        "You are a senior embedded systems expert analyzing MicroPython source code. "
+        "Explain in clear, technical English: "
+        "1) What the script does at a high level. "
+        "2) What hardware components or peripherals it interacts with. "
+        "3) Notable patterns — loops, callbacks, sleep intervals, pin configurations. "
+        "4) Potential improvements or bugs (e.g. infinite blocking loops, missing exception handling). "
+        "Keep response under 300 words. Plain paragraphs — no markdown headers."
+    ),
+    "circuitpython": (
+        "You are a senior embedded systems expert analyzing Adafruit CircuitPython source code. "
+        "Explain in clear, technical English: "
+        "1) What the script does at a high level. "
+        "2) What hardware components, peripherals, or Adafruit libraries it interacts with. "
+        "3) Notable patterns — board pin mappings, main loop execution, sensor readings. "
+        "4) Potential improvements or bugs (e.g. file writing safety, blocking delays). "
+        "Keep response under 300 words. Plain paragraphs — no markdown headers."
+    ),
+    "nodemcu": (
+        "You are a senior embedded systems expert analyzing Lua / NodeMCU source code. "
+        "Explain in clear, technical English: "
+        "1) What the script does at a high level. "
+        "2) What hardware components, timers, or network APIs it interacts with. "
+        "3) Notable patterns — event callbacks, file access, TCP/UDP sockets. "
+        "4) Potential improvements or bugs (e.g. heap exhaustion, unhandled timer loops). "
+        "Keep response under 300 words. Plain paragraphs — no markdown headers."
+    ),
+    "espruino": (
+        "You are a senior embedded systems expert analyzing Espruino JavaScript source code. "
+        "Explain in clear, technical English: "
+        "1) What the script does at a high level. "
+        "2) What hardware components, GPIO pins, or built-in JavaScript APIs it interacts with. "
+        "3) Notable patterns — timer intervals (setInterval), watch callbacks (setWatch), storage. "
+        "4) Potential improvements or bugs (e.g. memory leaks, non-blocking asynchronous flow). "
+        "Keep response under 300 words. Plain paragraphs — no markdown headers."
+    )
+}
+
+DEFAULT_SOURCE_PROMPT = (
+    "You are a senior embedded systems expert analyzing microcontroller script files. "
+    "Explain in clear, technical English: "
+    "1) What the script does at a high level. "
+    "2) What hardware components or peripherals it interacts with. "
+    "3) Notable patterns — loop structures, GPIO pin controls, timers. "
+    "4) Potential improvements or bugs. "
+    "Keep response under 300 words. Plain paragraphs — no markdown headers."
+)
+
+class ExplainSourceRequest(BaseModel):
+    filename: str
+    runtime: str
+    source_code: str
+    arch: str
+
+async def simulated_source_explain_generator(req: ExplainSourceRequest):
+    """Generates realistic source code explanations for Demo/Fallback Mode."""
+    fn = req.filename.lower()
+    
+    if "boot" in fn:
+        text = (
+            f"This is the boot-up script ({req.filename}) written for the {req.runtime} runtime on {req.arch.upper()}. "
+            "It configures default system parameters, mounts the filesystem, initializes serial communication, "
+            "and sets up the system path. It prepares the device environment before running the main application script."
+        )
+    elif "main" in fn or "code" in fn or "init" in fn:
+        text = (
+            f"This script ({req.filename}) is the main entry point running on {req.runtime} ({req.arch.upper()}). "
+            "It initializes the GPIO pins, establishes connection to the network/WiFi, and starts an execution loop. "
+            "It reads analog sensor values, processes the inputs, and outputs debug telemetry over serial. "
+            "A potential improvement is handling connection dropouts gracefully to prevent infinite loops."
+        )
+    else:
+        text = (
+            f"This source file ({req.filename}) contains application-level code running on {req.runtime} "
+            f"under the {req.arch.upper()} architecture. It implements helper functions, configurations, or drivers. "
+            "It shows structured syntax and follows native scripting guidelines. Auditors should verify import scopes."
+        )
+
+    words = text.split(" ")
+    for i, word in enumerate(words):
+        chunk = word + (" " if i < len(words) - 1 else "")
+        yield {
+            "event": "token",
+            "data": json.dumps({"token": chunk})
+        }
+        await asyncio.sleep(0.04)
+
+    yield {
+        "event": "done",
+        "data": json.dumps({"tokens_used": len(words) * 2})
+    }
+
+async def real_source_explain_generator(api_key: str, system_prompt: str, req: ExplainSourceRequest):
+    """Queries Anthropic API directly and streams text tokens for source code back."""
+    try:
+        async with AsyncAnthropic(api_key=api_key) as client:
+            user_content = (
+                f"Filename: {req.filename}\n"
+                f"Runtime: {req.runtime}\n"
+                f"Architecture: {req.arch}\n\n"
+                f"Source Code:\n{req.source_code}"
+            )
+            
+            response = await client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=500,
+                system=system_prompt,
+                messages=[
+                    {"role": "user", "content": user_content}
+                ],
+                stream=True
+            )
+            
+            input_tokens = 0
+            output_tokens = 0
+            
+            async for chunk in response:
+                if chunk.type == "message_start":
+                    input_tokens = chunk.message.usage.input_tokens
+                elif chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":
+                    yield {
+                        "event": "token",
+                        "data": json.dumps({"token": chunk.delta.text})
+                    }
+                elif chunk.type == "message_delta":
+                    output_tokens = chunk.usage.output_tokens
+                    
+            yield {
+                "event": "done",
+                "data": json.dumps({"tokens_used": input_tokens + output_tokens})
+            }
+    except Exception as e:
+        logger.error(f"Claude source API query exception: {e}")
+        yield {
+            "event": "error",
+            "data": json.dumps({"message": f"Anthropic connection failed: {str(e)}"})
+        }
+
+@router.post("/explain-source")
+async def explain_source_code(request: Request, req: ExplainSourceRequest):
+    """Endpoint facilitating real-time streamed explanations of script source files."""
+    # Apply IP-based rate limiting
+    ip = request.client.host if request.client else "unknown"
+    if not check_rate_limit(ip):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Max 10 requests per minute.")
+
+    # Cap source_code input at 3000 characters
+    if len(req.source_code) > 3000:
+        req.source_code = req.source_code[:3000] + "\n# ... [truncated for length]"
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    
+    if not api_key:
+        logger.info(f"ANTHROPIC_API_KEY is not defined. Initiating simulated explanation stream for source file: {req.filename}")
+        return EventSourceResponse(simulated_source_explain_generator(req))
+    else:
+        logger.info(f"Connecting to Anthropic API to analyze source file: {req.filename}")
+        system_prompt = SOURCE_SYSTEM_PROMPTS.get(req.runtime.lower(), DEFAULT_SOURCE_PROMPT)
+        return EventSourceResponse(real_source_explain_generator(api_key, system_prompt, req))

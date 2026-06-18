@@ -1,4 +1,4 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import List, Optional
 
 @dataclass
@@ -16,12 +16,13 @@ class MCUProfile:
     requires_tool: Optional[str] = None
     read_protected: bool = False
     supported: bool = True
+    common_runtimes: List[str] = field(default_factory=list)
+    detection_notes: str = ""
 
     def to_dict(self) -> dict:
         return asdict(self)
 
 MCU_REGISTRY = {
-    # ESPRESSIF
     "esp32": MCUProfile(
         mcu_id="esp32",
         display_name="ESP32 (Xtensa dual-core)",
@@ -32,7 +33,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=4194304,
         flash_sizes=[1048576, 2097152, 4194304, 8388608, 16777216],
-        bootloader_note="Hold the BOOT/GPIO0 button while establishing connection to force download mode."
+        bootloader_note="Hold the BOOT/GPIO0 button while establishing connection to force download mode.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['micropython', 'circuitpython', 'nodemcu', 'espruino', 'at-firmware', 'compiled'],
+        detection_notes="Probing serial interface via Ctrl+C/Ctrl+D reboot sequence, Lua, Espruino, and AT check."
     ),
     "esp32s2": MCUProfile(
         mcu_id="esp32s2",
@@ -44,7 +50,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=4194304,
         flash_sizes=[2097152, 4194304, 8388608, 16777216],
-        bootloader_note="Connect GPIO0 to ground during power-up to force device into download mode."
+        bootloader_note="Connect GPIO0 to ground during power-up to force device into download mode.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['micropython', 'circuitpython', 'nodemcu', 'espruino', 'at-firmware', 'compiled'],
+        detection_notes="Probing serial interface via Ctrl+C/Ctrl+D reboot sequence, Lua, Espruino, and AT check."
     ),
     "esp32s3": MCUProfile(
         mcu_id="esp32s3",
@@ -56,7 +67,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=8388608,
         flash_sizes=[4194304, 8388608, 16777216, 33554432],
-        bootloader_note="Ensure GPIO0 is pulled low on boot to enter the native ROM bootloader."
+        bootloader_note="Ensure GPIO0 is pulled low on boot to enter the native ROM bootloader.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['micropython', 'circuitpython', 'nodemcu', 'espruino', 'at-firmware', 'compiled'],
+        detection_notes="Probing serial interface via Ctrl+C/Ctrl+D reboot sequence, Lua, Espruino, and AT check."
     ),
     "esp32c3": MCUProfile(
         mcu_id="esp32c3",
@@ -68,7 +84,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=4194304,
         flash_sizes=[2097152, 4194304, 8388608],
-        bootloader_note="RISC-V single-core. Trigger download mode using standard GPIO9 low reset sequence."
+        bootloader_note="RISC-V single-core. Trigger download mode using standard GPIO9 low reset sequence.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['micropython', 'compiled'],
+        detection_notes="Probing serial interface for MicroPython REPL or compiled binary firmware."
     ),
     "esp32c6": MCUProfile(
         mcu_id="esp32c6",
@@ -80,7 +101,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=4194304,
         flash_sizes=[2097152, 4194304, 8388608],
-        bootloader_note="RISC-V core with Wi-Fi 6. Enter bootloader via GPIO9 low reset sequence."
+        bootloader_note="RISC-V core with Wi-Fi 6. Enter bootloader via GPIO9 low reset sequence.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['micropython', 'compiled'],
+        detection_notes="Probing serial interface for MicroPython REPL or compiled binary firmware."
     ),
     "esp32h2": MCUProfile(
         mcu_id="esp32h2",
@@ -92,7 +118,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=4194304,
         flash_sizes=[2097152, 4194304],
-        bootloader_note="RISC-V Thread/Zigbee SoC. Hold BOOT (GPIO9) low on reset."
+        bootloader_note="RISC-V Thread/Zigbee SoC. Hold BOOT (GPIO9) low on reset.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['micropython', 'compiled'],
+        detection_notes="Probing serial interface for MicroPython REPL or compiled binary firmware."
     ),
     "esp8266": MCUProfile(
         mcu_id="esp8266",
@@ -104,10 +135,13 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=4194304,
         flash_sizes=[524288, 1048576, 2097152, 4194304, 8388608, 16777216],
-        bootloader_note="Ground GPIO0 during reset to trigger the internal ROM bootloader."
+        bootloader_note="Ground GPIO0 during reset to trigger the internal ROM bootloader.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['micropython', 'nodemcu', 'espruino', 'at-firmware', 'compiled'],
+        detection_notes="Probing serial for MicroPython, NodeMCU Lua, Espruino JS, and AT command responses."
     ),
-
-    # AVR / ATMEL
     "atmega328p": MCUProfile(
         mcu_id="atmega328p",
         display_name="ATmega328P (Arduino Uno/Nano)",
@@ -118,7 +152,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=32768,
         flash_sizes=[32768],
-        bootloader_note="Uses Optiboot or standard Arduino bootloader. Automatic reset triggered via DTR line."
+        bootloader_note="Uses Optiboot or standard Arduino bootloader. Automatic reset triggered via DTR line.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "atmega2560": MCUProfile(
         mcu_id="atmega2560",
@@ -130,7 +169,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=262144,
         flash_sizes=[262144],
-        bootloader_note="STK500v2 protocol. Connects at 115200 baud over virtual COM port."
+        bootloader_note="STK500v2 protocol. Connects at 115200 baud over virtual COM port.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "atmega32u4": MCUProfile(
         mcu_id="atmega32u4",
@@ -142,7 +186,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=32768,
         flash_sizes=[32768],
-        bootloader_note="Requires a 1200-baud touch reset to activate the butterfly AVR109 bootloader."
+        bootloader_note="Requires a 1200-baud touch reset to activate the butterfly AVR109 bootloader.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "attiny85": MCUProfile(
         mcu_id="attiny85",
@@ -154,7 +203,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=8192,
         flash_sizes=[8192],
-        bootloader_note="Normally requires an AVR ISP programmer unless running the Micronucleus bootloader."
+        bootloader_note="Normally requires an AVR ISP programmer unless running the Micronucleus bootloader.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "attiny45": MCUProfile(
         mcu_id="attiny45",
@@ -166,7 +220,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=4096,
         flash_sizes=[4096],
-        bootloader_note="Normally requires an AVR ISP programmer connected over SPI."
+        bootloader_note="Normally requires an AVR ISP programmer connected over SPI.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "atmega4809": MCUProfile(
         mcu_id="atmega4809",
@@ -178,10 +237,13 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=49152,
         flash_sizes=[49152],
-        bootloader_note="Unified Program and Debug Interface (UPDI). Requires an onboard UPDI-to-USB bridge chip."
+        bootloader_note="Unified Program and Debug Interface (UPDI). Requires an onboard UPDI-to-USB bridge chip.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
-
-    # STM32
     "stm32f1": MCUProfile(
         mcu_id="stm32f1",
         display_name="STM32F1xx (Blue Pill)",
@@ -189,10 +251,15 @@ MCU_REGISTRY = {
         protocol="STM32-UART",
         ghidra_lang="ARM:LE:32:Cortex",
         default_baud=115200,
-        flash_base=0x08000000,
+        flash_base=0x8000000,
         default_flash_size=65536,
         flash_sizes=[65536, 131072],
-        bootloader_note="Set BOOT0 jumper to high (1) and pulse RESET to activate system memory bootloader."
+        bootloader_note="Set BOOT0 jumper to high (1) and pulse RESET to activate system memory bootloader.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['micropython', 'espruino', 'elua', 'forth', 'rtos-riot', 'zephyr', 'compiled'],
+        detection_notes="Probing serial interface for MicroPython, Espruino, eLua, RTOS shells, or Forth prompts."
     ),
     "stm32f4": MCUProfile(
         mcu_id="stm32f4",
@@ -201,10 +268,15 @@ MCU_REGISTRY = {
         protocol="STM32-UART",
         ghidra_lang="ARM:LE:32:Cortex",
         default_baud=115200,
-        flash_base=0x08000000,
+        flash_base=0x8000000,
         default_flash_size=524288,
         flash_sizes=[524288, 1048576],
-        bootloader_note="Press BOOT0 on power-up to enter built-in STM32 system bootloader."
+        bootloader_note="Press BOOT0 on power-up to enter built-in STM32 system bootloader.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['micropython', 'espruino', 'elua', 'forth', 'rtos-riot', 'zephyr', 'compiled'],
+        detection_notes="Probing serial interface for MicroPython, Espruino, eLua, RTOS shells, or Forth prompts."
     ),
     "stm32l0": MCUProfile(
         mcu_id="stm32l0",
@@ -213,10 +285,15 @@ MCU_REGISTRY = {
         protocol="STM32-UART",
         ghidra_lang="ARM:LE:32:Cortex",
         default_baud=115200,
-        flash_base=0x08000000,
+        flash_base=0x8000000,
         default_flash_size=65536,
         flash_sizes=[32768, 65536, 131072],
-        bootloader_note="Ultra-low power Cortex-M0+. Set BOOT0 High to launch ROM bootloader."
+        bootloader_note="Ultra-low power Cortex-M0+. Set BOOT0 High to launch ROM bootloader.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "stm32l4": MCUProfile(
         mcu_id="stm32l4",
@@ -225,10 +302,15 @@ MCU_REGISTRY = {
         protocol="STM32-UART",
         ghidra_lang="ARM:LE:32:Cortex",
         default_baud=115200,
-        flash_base=0x08000000,
+        flash_base=0x8000000,
         default_flash_size=262144,
         flash_sizes=[262144, 524288, 1048576],
-        bootloader_note="Low-power Cortex-M4. Set BOOT0 High to launch system bootloader."
+        bootloader_note="Low-power Cortex-M4. Set BOOT0 High to launch system bootloader.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['micropython', 'espruino', 'elua', 'forth', 'rtos-riot', 'zephyr', 'compiled'],
+        detection_notes="Probing serial interface for MicroPython, Espruino, eLua, RTOS shells, or Forth prompts."
     ),
     "stm32g0": MCUProfile(
         mcu_id="stm32g0",
@@ -237,10 +319,15 @@ MCU_REGISTRY = {
         protocol="STM32-UART",
         ghidra_lang="ARM:LE:32:Cortex",
         default_baud=115200,
-        flash_base=0x08000000,
+        flash_base=0x8000000,
         default_flash_size=131072,
         flash_sizes=[64512, 131072, 262144],
-        bootloader_note="Configure BOOT0 pin / user options and reset to run ROM bootloader."
+        bootloader_note="Configure BOOT0 pin / user options and reset to run ROM bootloader.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['micropython', 'espruino', 'elua', 'forth', 'rtos-riot', 'zephyr', 'compiled'],
+        detection_notes="Probing serial interface for MicroPython, Espruino, eLua, RTOS shells, or Forth prompts."
     ),
     "stm32g4": MCUProfile(
         mcu_id="stm32g4",
@@ -249,10 +336,15 @@ MCU_REGISTRY = {
         protocol="STM32-UART",
         ghidra_lang="ARM:LE:32:Cortex",
         default_baud=115200,
-        flash_base=0x08000000,
+        flash_base=0x8000000,
         default_flash_size=262144,
         flash_sizes=[131072, 262144, 524288],
-        bootloader_note="Analog Cortex-M4. Hold BOOT0 High and toggle reset to enter bootloader."
+        bootloader_note="Analog Cortex-M4. Hold BOOT0 High and toggle reset to enter bootloader.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['micropython', 'espruino', 'elua', 'forth', 'rtos-riot', 'zephyr', 'compiled'],
+        detection_notes="Probing serial interface for MicroPython, Espruino, eLua, RTOS shells, or Forth prompts."
     ),
     "stm32h7": MCUProfile(
         mcu_id="stm32h7",
@@ -261,10 +353,15 @@ MCU_REGISTRY = {
         protocol="STM32-UART",
         ghidra_lang="ARM:LE:32:Cortex",
         default_baud=115200,
-        flash_base=0x08000000,
+        flash_base=0x8000000,
         default_flash_size=1048576,
         flash_sizes=[1048576, 2097152],
-        bootloader_note="Set BOOT0 to High and cycle power/reset to launch built-in system bootloader."
+        bootloader_note="Set BOOT0 to High and cycle power/reset to launch built-in system bootloader.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['micropython', 'espruino', 'elua', 'forth', 'rtos-riot', 'zephyr', 'compiled'],
+        detection_notes="Probing serial interface for MicroPython, Espruino, eLua, RTOS shells, or Forth prompts."
     ),
     "gd32f1": MCUProfile(
         mcu_id="gd32f1",
@@ -273,13 +370,16 @@ MCU_REGISTRY = {
         protocol="STM32-UART",
         ghidra_lang="ARM:LE:32:Cortex",
         default_baud=115200,
-        flash_base=0x08000000,
+        flash_base=0x8000000,
         default_flash_size=65536,
         flash_sizes=[65536, 131072, 262144],
-        bootloader_note="GigaDevice STM32F103 clone. Compatible with standard STM32 AN3155 bootloader protocol."
+        bootloader_note="GigaDevice STM32F103 clone. Compatible with standard STM32 AN3155 bootloader protocol.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
-
-    # RP-SERIES
     "rp2040": MCUProfile(
         mcu_id="rp2040",
         display_name="RP2040 (Raspberry Pi Pico)",
@@ -290,7 +390,12 @@ MCU_REGISTRY = {
         flash_base=0x10000000,
         default_flash_size=2097152,
         flash_sizes=[2097152, 4194304, 8388608, 16777216],
-        bootloader_note="Hold the BOOTSEL button while plugging in to mount as USB MSD. Read using picotool or mount copy."
+        bootloader_note="Hold the BOOTSEL button while plugging in to mount as USB MSD. Read using picotool or mount copy.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['micropython', 'circuitpython', 'compiled'],
+        detection_notes="Probing serial interface for MicroPython and CircuitPython REPL prompts."
     ),
     "rp2350": MCUProfile(
         mcu_id="rp2350",
@@ -302,10 +407,13 @@ MCU_REGISTRY = {
         flash_base=0x10000000,
         default_flash_size=4194304,
         flash_sizes=[4194304, 8388608, 16777216],
-        bootloader_note="Hold the BOOTSEL button while plugging in to trigger USB bootloader."
+        bootloader_note="Hold the BOOTSEL button while plugging in to trigger USB bootloader.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['micropython', 'circuitpython', 'compiled'],
+        detection_notes="Probing serial interface for MicroPython and CircuitPython REPL prompts."
     ),
-
-    # SAMD
     "samd21": MCUProfile(
         mcu_id="samd21",
         display_name="SAMD21 (Arduino Zero, MKR)",
@@ -313,10 +421,15 @@ MCU_REGISTRY = {
         protocol="BOSSA",
         ghidra_lang="ARM:LE:32:Cortex",
         default_baud=1200,
-        flash_base=0x00000000,
+        flash_base=0x0,
         default_flash_size=262144,
         flash_sizes=[262144],
-        bootloader_note="BOSSA Protocol. Resets to bootloader upon 1200 baud serial touch connection."
+        bootloader_note="BOSSA Protocol. Resets to bootloader upon 1200 baud serial touch connection.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['circuitpython', 'openmv', 'espruino', 'compiled'],
+        detection_notes="Checking for Adafruit CircuitPython USB storage and REPL probes."
     ),
     "samd51": MCUProfile(
         mcu_id="samd51",
@@ -325,13 +438,16 @@ MCU_REGISTRY = {
         protocol="BOSSA",
         ghidra_lang="ARM:LE:32:Cortex",
         default_baud=1200,
-        flash_base=0x00000000,
+        flash_base=0x0,
         default_flash_size=524288,
         flash_sizes=[524288, 1048576],
-        bootloader_note="BOSSA Protocol. Double tap Reset button to trigger bootloader mode."
+        bootloader_note="BOSSA Protocol. Double tap Reset button to trigger bootloader mode.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['circuitpython', 'openmv', 'espruino', 'compiled'],
+        detection_notes="Checking for Adafruit CircuitPython USB storage and REPL probes."
     ),
-
-    # NORDIC
     "nrf52840": MCUProfile(
         mcu_id="nrf52840",
         display_name="nRF52840",
@@ -343,7 +459,11 @@ MCU_REGISTRY = {
         default_flash_size=1048576,
         flash_sizes=[1048576],
         bootloader_note="Requires Nordic DFU/nrfjprog tool. Read protection must be disabled to dump.",
-        requires_tool="nrfjprog"
+        requires_tool="nrfjprog",
+        read_protected=False,
+        supported=True,
+        common_runtimes=['circuitpython', 'espruino', 'compiled'],
+        detection_notes="Probing serial link for CircuitPython or Espruino interactive prompts."
     ),
     "nrf52833": MCUProfile(
         mcu_id="nrf52833",
@@ -356,7 +476,11 @@ MCU_REGISTRY = {
         default_flash_size=524288,
         flash_sizes=[524288],
         bootloader_note="Requires Nordic nrfjprog tools for extraction over SWD/serial.",
-        requires_tool="nrfjprog"
+        requires_tool="nrfjprog",
+        read_protected=False,
+        supported=True,
+        common_runtimes=['circuitpython', 'espruino', 'compiled'],
+        detection_notes="Probing serial link for CircuitPython or Espruino interactive prompts."
     ),
     "nrf51822": MCUProfile(
         mcu_id="nrf51822",
@@ -369,10 +493,12 @@ MCU_REGISTRY = {
         default_flash_size=262144,
         flash_sizes=[131072, 262144],
         bootloader_note="Older Bluetooth LE chip. Requires nrfjprog for SWD dumping.",
-        requires_tool="nrfjprog"
+        requires_tool="nrfjprog",
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
-
-    # NXP LPC
     "lpc1768": MCUProfile(
         mcu_id="lpc1768",
         display_name="LPC1768 (mbed)",
@@ -383,7 +509,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=524288,
         flash_sizes=[524288],
-        bootloader_note="NXP ISP mode over UART. Connect ISP pin to ground, pulse reset to enter."
+        bootloader_note="NXP ISP mode over UART. Connect ISP pin to ground, pulse reset to enter.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled', 'forth'],
+        detection_notes="Probing serial interface for compiled binary or Forth console prompts."
     ),
     "lpc1114": MCUProfile(
         mcu_id="lpc1114",
@@ -395,7 +526,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=32768,
         flash_sizes=[32768, 65536],
-        bootloader_note="Synchronizes at 9600 baud using ASCII ISP commands."
+        bootloader_note="Synchronizes at 9600 baud using ASCII ISP commands.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "lpc54608": MCUProfile(
         mcu_id="lpc54608",
@@ -407,7 +543,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=524288,
         flash_sizes=[524288],
-        bootloader_note="NXP ISP bootloader over UART. Assert ISP pins during boot."
+        bootloader_note="NXP ISP bootloader over UART. Assert ISP pins during boot.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "mimxrt1060": MCUProfile(
         mcu_id="mimxrt1060",
@@ -419,10 +560,13 @@ MCU_REGISTRY = {
         flash_base=0x60000000,
         default_flash_size=2097152,
         flash_sizes=[2097152, 4194304, 8388608, 16777216],
-        bootloader_note="Teensy 4.x bootloader chip or NXP SDP mode over USB HID."
+        bootloader_note="Teensy 4.x bootloader chip or NXP SDP mode over USB HID.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['circuitpython', 'micropython', 'compiled'],
+        detection_notes="Probing serial interface for MicroPython and CircuitPython REPL."
     ),
-
-    # TI MSP430
     "msp430g2": MCUProfile(
         mcu_id="msp430g2",
         display_name="MSP430G2",
@@ -430,10 +574,15 @@ MCU_REGISTRY = {
         protocol="TI-BSL",
         ghidra_lang="TI_MSP430:LE:16:default",
         default_baud=9600,
-        flash_base=0xC000,
+        flash_base=0xc000,
         default_flash_size=16384,
         flash_sizes=[8192, 16384],
-        bootloader_note="MSP430 Bootstrap Loader (BSL). Invoke by pulsing RST and TEST pins."
+        bootloader_note="MSP430 Bootstrap Loader (BSL). Invoke by pulsing RST and TEST pins.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "msp430f5": MCUProfile(
         mcu_id="msp430f5",
@@ -445,7 +594,12 @@ MCU_REGISTRY = {
         flash_base=0x8000,
         default_flash_size=131072,
         flash_sizes=[65536, 131072, 262144],
-        bootloader_note="MSP430 5xx series BSL. Uses specialized BSL entry sequence on TEST/RST."
+        bootloader_note="MSP430 5xx series BSL. Uses specialized BSL entry sequence on TEST/RST.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "msp430fr5": MCUProfile(
         mcu_id="msp430fr5",
@@ -457,10 +611,13 @@ MCU_REGISTRY = {
         flash_base=0x8000,
         default_flash_size=65536,
         flash_sizes=[32768, 65536, 131072],
-        bootloader_note="MSP430 FRAM series BSL. FRAM requires no sector erasing before writes."
+        bootloader_note="MSP430 FRAM series BSL. FRAM requires no sector erasing before writes.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
-
-    # WCH
     "ch32v003": MCUProfile(
         mcu_id="ch32v003",
         display_name="CH32V003",
@@ -468,10 +625,15 @@ MCU_REGISTRY = {
         protocol="WCH-ISP",
         ghidra_lang="RISCV:LE:32:RV32EC",
         default_baud=115200,
-        flash_base=0x08000000,
+        flash_base=0x8000000,
         default_flash_size=16384,
         flash_sizes=[16384],
-        bootloader_note="RISC-V CH32V003. Ground the BOOT0 pin during power-on to invoke UART bootloader."
+        bootloader_note="RISC-V CH32V003. Ground the BOOT0 pin during power-on to invoke UART bootloader.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "ch32v203": MCUProfile(
         mcu_id="ch32v203",
@@ -480,10 +642,15 @@ MCU_REGISTRY = {
         protocol="WCH-ISP",
         ghidra_lang="RISCV:LE:32:RV32GC",
         default_baud=115200,
-        flash_base=0x08000000,
+        flash_base=0x8000000,
         default_flash_size=65536,
         flash_sizes=[65536, 131072, 262144],
-        bootloader_note="RISC-V CH32V203. Hold BOOT0 high and reset to invoke WCH bootloader."
+        bootloader_note="RISC-V CH32V203. Hold BOOT0 high and reset to invoke WCH bootloader.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "ch552": MCUProfile(
         mcu_id="ch552",
@@ -495,7 +662,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=16384,
         flash_sizes=[16384],
-        bootloader_note="8051-compatible CH552. Hold PROG button (USB D+ pull-up) while plugging in to invoke ISP."
+        bootloader_note="8051-compatible CH552. Hold PROG button (USB D+ pull-up) while plugging in to invoke ISP.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "ch554": MCUProfile(
         mcu_id="ch554",
@@ -507,10 +679,13 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=16384,
         flash_sizes=[16384],
-        bootloader_note="8051-compatible CH554. Hold PROG button (USB D+ pull-up) while plugging in to invoke ISP."
+        bootloader_note="8051-compatible CH554. Hold PROG button (USB D+ pull-up) while plugging in to invoke ISP.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
-
-    # MICROCHIP PIC
     "pic16f": MCUProfile(
         mcu_id="pic16f",
         display_name="PIC16F",
@@ -522,7 +697,11 @@ MCU_REGISTRY = {
         default_flash_size=14336,
         flash_sizes=[14336, 28672],
         bootloader_note="PIC16F requires ICSP (In-Circuit Serial Programming) using PICkit or ICD programmer.",
-        requires_tool="pickit"
+        requires_tool="pickit",
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "pic18f": MCUProfile(
         mcu_id="pic18f",
@@ -535,7 +714,11 @@ MCU_REGISTRY = {
         default_flash_size=32768,
         flash_sizes=[32768, 65536, 131072],
         bootloader_note="PIC18F requires ICSP using PICkit or compatible programmer.",
-        requires_tool="pickit"
+        requires_tool="pickit",
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "pic32mx": MCUProfile(
         mcu_id="pic32mx",
@@ -544,14 +727,16 @@ MCU_REGISTRY = {
         protocol="ICSP",
         ghidra_lang="MIPS:LE:32:micro",
         default_baud=0,
-        flash_base=0x1FC00000,
+        flash_base=0x1fc00000,
         default_flash_size=524288,
         flash_sizes=[262144, 524288],
         bootloader_note="MIPS-based PIC32MX. Requires ICSP or ICD programmer.",
-        requires_tool="pickit"
+        requires_tool="pickit",
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
-
-    # RENESAS
     "rl78": MCUProfile(
         mcu_id="rl78",
         display_name="Renesas RL78",
@@ -562,7 +747,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=65536,
         flash_sizes=[32768, 65536, 131072],
-        bootloader_note="RL78 Single-Wire UART bootloader. Requires dedicated tool or reset sequence."
+        bootloader_note="RL78 Single-Wire UART bootloader. Requires dedicated tool or reset sequence.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "rx65n": MCUProfile(
         mcu_id="rx65n",
@@ -571,10 +761,15 @@ MCU_REGISTRY = {
         protocol="RENESAS-UART",
         ghidra_lang="RX:LE:32:default",
         default_baud=115200,
-        flash_base=0xFFE00000,
+        flash_base=0xffe00000,
         default_flash_size=1048576,
         flash_sizes=[1048576, 2097152],
-        bootloader_note="Renesas RX65N Boot Mode over UART interface."
+        bootloader_note="Renesas RX65N Boot Mode over UART interface.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "ra4m1": MCUProfile(
         mcu_id="ra4m1",
@@ -586,10 +781,13 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=262144,
         flash_sizes=[262144],
-        bootloader_note="RA4M1 Cortex-M4 (Arduino UNO R4). Connect MD pin to ground during boot to enter SCI bootloader."
+        bootloader_note="RA4M1 Cortex-M4 (Arduino UNO R4). Connect MD pin to ground during boot to enter SCI bootloader.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
-
-    # SILICON LABS
     "efm32gg": MCUProfile(
         mcu_id="efm32gg",
         display_name="EFM32 Giant Gecko",
@@ -600,7 +798,12 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=1048576,
         flash_sizes=[524288, 1048576],
-        bootloader_note="Silicon Labs UART Bootloader. Responds to 'r' command with XMODEM-CRC firmware read."
+        bootloader_note="Silicon Labs UART Bootloader. Responds to 'r' command with XMODEM-CRC firmware read.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "efm32tg": MCUProfile(
         mcu_id="efm32tg",
@@ -612,10 +815,13 @@ MCU_REGISTRY = {
         flash_base=0x0,
         default_flash_size=32768,
         flash_sizes=[32768],
-        bootloader_note="Silicon Labs UART Bootloader. Responds to 'r' command with XMODEM-CRC."
+        bootloader_note="Silicon Labs UART Bootloader. Responds to 'r' command with XMODEM-CRC.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
-
-    # INFINEON
     "xmc1100": MCUProfile(
         mcu_id="xmc1100",
         display_name="XMC1100 (M0)",
@@ -626,7 +832,12 @@ MCU_REGISTRY = {
         flash_base=0x10001000,
         default_flash_size=65536,
         flash_sizes=[65536],
-        bootloader_note="Infineon bootstrap loader mode. Enabled via BMI configuration pins."
+        bootloader_note="Infineon bootstrap loader mode. Enabled via BMI configuration pins.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
     "xmc4700": MCUProfile(
         mcu_id="xmc4700",
@@ -635,13 +846,16 @@ MCU_REGISTRY = {
         protocol="UART-BSL",
         ghidra_lang="ARM:LE:32:Cortex",
         default_baud=115200,
-        flash_base=0x0C000000,
+        flash_base=0xc000000,
         default_flash_size=2097152,
         flash_sizes=[2097152],
-        bootloader_note="Infineon bootstrap loader mode. Configure pins to boot from PSRAM/UART BSL."
+        bootloader_note="Infineon bootstrap loader mode. Configure pins to boot from PSRAM/UART BSL.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     ),
-
-    # GIGADEVICE
     "gd32vf103": MCUProfile(
         mcu_id="gd32vf103",
         display_name="GD32VF103 (Longan Nano)",
@@ -649,9 +863,14 @@ MCU_REGISTRY = {
         protocol="DFU-USB",
         ghidra_lang="RISCV:LE:32:RV32IMAC",
         default_baud=0,
-        flash_base=0x08000000,
+        flash_base=0x8000000,
         default_flash_size=131072,
         flash_sizes=[131072],
-        bootloader_note="Hold BOOT0 High during boot to enter built-in DFU bootloader over USB."
+        bootloader_note="Hold BOOT0 High during boot to enter built-in DFU bootloader over USB.",
+        requires_tool=None,
+        read_protected=False,
+        supported=True,
+        common_runtimes=['compiled'],
+        detection_notes="Probing interface for compiled binary firmware."
     )
 }

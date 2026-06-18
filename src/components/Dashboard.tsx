@@ -11,6 +11,8 @@ import { StatusBar } from './StatusBar';
 import { CodeExplorer } from './CodeExplorer';
 import { ErrorBoundary } from './CodeExplorer/ErrorBoundary';
 import { AlertTriangle, AlertCircle } from 'lucide-react';
+import { FileBrowser } from './FileBrowser';
+import { RuntimeBadge } from './FileBrowser/RuntimeBadge';
 
 export const Dashboard: React.FC = () => {
   const {
@@ -49,6 +51,13 @@ export const Dashboard: React.FC = () => {
     clearLogs,
     hexBuffer,
     appendLog,
+    
+    // Smart Detect
+    detectedRuntime,
+    recommendedAction,
+    forceBinaryExtraction,
+    setForceBinaryExtraction,
+    detectionMessage,
   } = useAppContext();
 
   const [expandedPanel, setExpandedPanel] = useState<'hardware' | 'extractor' | 'device' | 'decompiler' | null>('hardware');
@@ -57,14 +66,23 @@ export const Dashboard: React.FC = () => {
     setExpandedPanel((prev) => (prev === panel ? null : panel));
   };
 
+  const isConnected = connectionStatus === 'connected';
+  const showFileBrowser = isConnected && recommendedAction === 'file-browser' && !forceBinaryExtraction;
+  const showTerminalOnly = isConnected && recommendedAction === 'terminal' && !forceBinaryExtraction;
+  const showInfoOnly = isConnected && recommendedAction === 'info-only' && !forceBinaryExtraction;
+
   // Auto-expand appropriate panels on state changes
   useEffect(() => {
     if (connectionStatus === 'connected') {
-      setExpandedPanel('extractor');
+      if (showFileBrowser) {
+        setExpandedPanel('device');
+      } else {
+        setExpandedPanel('extractor');
+      }
     } else if (connectionStatus === 'idle') {
       setExpandedPanel('hardware');
     }
-  }, [connectionStatus]);
+  }, [connectionStatus, showFileBrowser]);
 
   useEffect(() => {
     if (extractionStatus === 'done') {
@@ -144,8 +162,30 @@ export const Dashboard: React.FC = () => {
               onToggle={() => togglePanel('device')}
             />
 
+            {/* Interpreted Runtime active CTA / Override */}
+            {showFileBrowser && (
+              <div className="rounded-lg p-5 flex flex-col bg-[#111111] space-y-3" style={{ border: '1px solid var(--border-subtle)' }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono tracking-wider uppercase text-[var(--text-secondary)]">Active Environment</span>
+                  <RuntimeBadge runtime={detectedRuntime} />
+                </div>
+                <p className="text-[11px] text-[#888888] leading-relaxed">
+                  This microcontroller runs an interpreted environment. Plain-text script files can be directly browsed, analyzed, and modified without binary extraction.
+                </p>
+                <div className="pt-2">
+                  <button
+                    onClick={() => setForceBinaryExtraction(true)}
+                    className="w-full py-1.5 rounded text-[10px] font-mono font-semibold transition-all hover:bg-[#222222] border border-[#222222]"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    Switch to Binary Extraction
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Handoff Panel: Active when firmware extraction completes or in done state */}
-            {extractionStatus === 'done' && (
+            {extractionStatus === 'done' && !showFileBrowser && (
               <HandoffPanel
                 uploadStatus={uploadStatus}
                 uploadProgress={uploadProgress}
@@ -163,19 +203,39 @@ export const Dashboard: React.FC = () => {
             )}
           </section>
 
-          {/* Right Column: Terminal Stream (65%) & Hex Dump (35%) */}
-          <section className="lg:col-span-7 flex flex-col space-y-4 min-h-0 overflow-hidden">
-            <div className="flex-1 flex flex-col min-h-0">
-              <TerminalPane logs={terminalLogs} clearLogs={clearLogs} />
-            </div>
-            <div className="shrink-0 w-full">
-              <HexPreviewStrip
-                liveBuffer={hexBuffer}
-                flashBuffer={flashBuffer}
-                extractionStatus={extractionStatus}
-              />
-            </div>
-          </section>
+          {/* Right Column: Terminal Stream (65%) & Hex Dump (35%) OR File Browser OR Terminal-Only */}
+          {showFileBrowser ? (
+            <section className="lg:col-span-7 flex flex-col min-h-0 overflow-hidden">
+              <FileBrowser />
+            </section>
+          ) : showTerminalOnly || showInfoOnly ? (
+            <section className="lg:col-span-7 flex flex-col space-y-4 min-h-0 overflow-hidden">
+              <div className="bg-[#111111] border border-[var(--border-subtle)] rounded-lg p-5 shrink-0">
+                <h3 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>
+                  {detectedRuntime === 'at-firmware' ? 'AT Command Mode' : `${detectedRuntime.toUpperCase()} Shell Mode`}
+                </h3>
+                <p className="text-[11px] text-[#A0A0A0] leading-relaxed">
+                  {detectionMessage || 'Interactive console mode. Use the terminal below to interface with the device runtime.'}
+                </p>
+              </div>
+              <div className="flex-1 flex flex-col min-h-0">
+                <TerminalPane logs={terminalLogs} clearLogs={clearLogs} />
+              </div>
+            </section>
+          ) : (
+            <section className="lg:col-span-7 flex flex-col space-y-4 min-h-0 overflow-hidden">
+              <div className="flex-1 flex flex-col min-h-0">
+                <TerminalPane logs={terminalLogs} clearLogs={clearLogs} />
+              </div>
+              <div className="shrink-0 w-full">
+                <HexPreviewStrip
+                  liveBuffer={hexBuffer}
+                  flashBuffer={flashBuffer}
+                  extractionStatus={extractionStatus}
+                />
+              </div>
+            </section>
+          )}
         </div>
       </main>
 

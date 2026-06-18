@@ -4,15 +4,22 @@ BININO is a universal, web-based toolkit designed for firmware extraction, stati
 
 ---
 
+`Version 2.0.0` • `FastAPI Backend` • `React + Vite Frontend` • `50 MCU Profiles` • `10 Flash Protocols`
+
+---
+
 ## Key Features and Capabilities
 
 * **Web-Based Hardware Bridge**: Connect directly to microcontrollers (ESP32, ESP8266, ARM Cortex-M, AVR, RISC-V) via USB from the browser, eliminating the need for local drivers or native client installations.
-* **Expanded Microcontroller Registry**: Configured with a comprehensive database of 36 distinct MCU variants across 11 major chip families (Espressif, AVR, STM32, RP-series, SAMD, Nordic nRF, NXP LPC, TI MSP430, WCH, Renesas, Silicon Labs, Infineon, and GigaDevice).
+* **Smart Runtime Detector (v2.0.0)**: Automatically probes on-connect serial interfaces to identify what runtime environment is running (e.g. MicroPython, CircuitPython, Lua/NodeMCU, Espruino, AT-firmware, TinyBASIC, Forth, or compiled firmware) using regex signature matching and base64 encoded stream parsing.
+* **Interactive File Browser (v2.0.0)**: Directly browses, reads, and downloads files from interpreted environments. Features an interactive directory tree, syntax-highlighted code editor, REPL terminal passthrough, and client-side ZIP packaging using JSZip.
+* **Expanded Microcontroller Registry**: Configured with a comprehensive database of 50 distinct MCU variants across 14 major chip families (Espressif, AVR, STM32, RP-series, SAMD, Nordic nRF, NXP LPC, TI MSP430, WCH, Microchip PIC, Renesas, Silicon Labs, Infineon XMC, and GigaDevice RISC-V).
 * **Automated ROM Extraction Protocols**: Includes 10 standalone protocol handler modules covering Espressif SLIP, STM32 AN3155 UART, STK500v1/v2, AVR109, UPDI, BOSSA, TI-BSL BSL, NRF-DFU, WCH-ISP, LPC-ISP ASCII sync, and Silicon Labs EFM32 XMODEM-CRC.
+* **Four-Route split dashboard**: Features tabs for Extractor, File Browser, Bootloader Mode guidelines, and Serial Console Terminal for optimal interface workspace management.
 * **Unified Accordion Sidebar**: Provides a smooth transition through the connection, extraction, metadata, and handoff stages with a mutually exclusive collapsible sidebar stack.
 * **Automated Ghidra Pipeline**: Executes headless Ghidra analysis on a local FastAPI server. Disassembles and decompiles imported binary blobs, enforcing explicit memory boundaries (`-loader BinaryLoader` and dynamic `-loader-baseAddr`) and mapping raw instructions back into clean pseudo-C, symbols, and string tables.
 * **IDE-Style Code Explorer**: Features a three-pane layout including a function/symbol list searcher, a syntax-highlighted decompiler view (C and Assembly), and a virtualized memory Hex Dump synced to the active function's bounds.
-* **Claude AI Assistant**: Streams step-by-step plain-English explanations of target functions directly in the IDE to assist in security reviews and hardware audits. Enforces sliding-window rate limits (10 requests/min per IP) and input limits (3,000 characters).
+* **Claude AI Assistant**: Streams step-by-step plain-English explanations of target functions and interpreted script files directly in the IDE to assist in security reviews and hardware audits. Enforces sliding-window rate limits (10 requests/min per IP) and input limits (3,000 characters).
 * **Portable HTML Reports**: Exports fully self-contained offline reports containing all decompiled C code, assembly listings, symbols, and strings.
 
 ---
@@ -45,6 +52,36 @@ BININO utilizes a distributed architecture that keeps hardware communication and
                                |  | (analyzeHeadless)  |   | (Explain Stream) |  |
                                |  +--------------------+   +------------------+  |
                                +-------------------------------------------------+
+```
+
+### Smart Runtime Detection and File Browser Data Flow
+
+When a microcontroller is connected, BININO executes a multi-stage flow to check for interpreted runtimes:
+
+```text
++---------------------+
+| Connected MCU       |
++----------+----------+
+           |
+           | 1. Auto-probe / Reboot check
+           v
++----------+----------+
+| useSmartDetect (Web) | <--- Probes Ctrl+C / Ctrl+D sequence (512 Bytes)
++----------+----------+
+           |
+           | 2. Base64 Encode & POST /api/detect
+           v
++----------+----------+
+| FastAPI Backend     | <--- Runs regex on signatures (MicroPython, NodeMCU, etc.)
++----------+----------+
+           |
+           | 3. Returns Action, Filesystem commands, Version info
+           v
++----------+----------+
+| Dashboard Routing   |
+|   - file-browser    | ===> Renders FileTree, FileViewer, ReplPassthrough, JSZip download
+|   - extract         | ===> Standard ROM bootloader extraction flow
++---------------------+
 ```
 
 ---
@@ -96,6 +133,21 @@ Phase 6 adds layout responsiveness and operation protections:
 * **Scroll-Safe Layout Constraints**: Removed fixed wrapper heights around the Hex Buffer Preview to let the Terminal logs pane scale dynamically. This prevents layout overflow clipping and locks scroll coordinates.
 * **Active Extraction Lock**: Toggling expansion of the Hex Buffer Preview is locked and disabled with visual indicators (lock icon, opacity fade, tooltip warnings) during active extraction runs, preventing serial log scrolling disruptions.
 * **Landing Page Visibility**: Optimized paddings and margins on the home landing page to draw the wordmark and cards upwards, keeping the footer visible in standard viewports without requiring vertical scrollbar adjustments.
+
+### Phase 7: Smart Runtime Detection (v2.0.0)
+Phase 7 introduces automatic environment detection to identify interpreted microcontrollers:
+* **Asynchronous Serial Probing Hook**: `useSmartDetect.ts` implements a multi-sequence port prober with `Promise.race` and a 3-second timeout. Checks for REPL prompts, lua prompts, and AT-commands.
+* **State Management**: Integrated into `AppContext.tsx` to pause/resume standard serial loops during detection sequences and support manual override toggles.
+* **Regex Detection Service**: Matches port data against defined signatures on the backend (`runtime_detector.py`) to classify environments.
+* **Failsafe Actions**: Maps runtimes to appropriate views, suggesting ROM extraction only for compiled firmware to prevent users from dumping the interpreter itself.
+
+### Phase 8: Interactive File Browser (v2.0.0)
+Phase 8 implements the browser UI for direct file reads and execution on interpreted runtimes:
+* **Interactive Directory Tree**: Lists directories and files, styling them with file icons. Supports micro-animations on expansion and selection.
+* **Local Drive Mount Picker**: Mounts CircuitPython directories via browser local folder handle queries (`showDirectoryPicker`), enabling local system syncs.
+* **Syntax Highlighted Viewer**: Displays scripts in Python, Javascript, Lua, Basic, and Forth. Integrates Claude AI script analysis and code structure explanations.
+* **Repl CLI Console**: Provides an interactive terminal console to send direct CLI commands to MicroPython, CircuitPython, NodeMCU, and Espruino devices.
+* **Client-Side ZIP Exporter**: Packages directories and files on the fly into compressed `.zip` files using JSZip.
 
 ---
 
@@ -173,6 +225,104 @@ The FastAPI backend exposes the following endpoints:
   }
   ```
 * **Response**: `text/event-stream` (subject to 10 requests/min/IP rate limiting; truncates `pseudo_c` at 3,000 characters).
+
+### 5. Smart Runtime Detection
+* **Route**: `POST /api/detect`
+* **Request (JSON)**:
+  ```json
+  {
+    "port_data": "dTI9Pj4gY29tcGxldGUgcHJvYmUgZGF0YQ==",
+    "arch": "esp32"
+  }
+  ```
+* **Response (JSON)**:
+  ```json
+  {
+    "runtime": "micropython",
+    "confidence": "high",
+    "runtime_version": "1.22.0",
+    "action": "file-browser",
+    "message": "MicroPython detected (confidence: high). Bypassing binary extraction.",
+    "filesystem_commands": {
+      "list": "import os; print(os.listdir('/'))",
+      "read": "f=open('{filename}'); print(f.read()); f.close()",
+      "size": "import os; print(os.stat('{filename}')[6])",
+      "space": "import os; s=os.statvfs('/'); print(s[0]*s[3])"
+    },
+    "frozen_module_hint": false
+  }
+  ```
+
+### 6. Stream Claude AI Source Script Explanations
+* **Route**: `POST /api/explain-source`
+* **Request (JSON)**:
+  ```json
+  {
+    "filename": "boot.py",
+    "runtime": "micropython",
+    "source_code": "import gc\ngc.collect()"
+  }
+  ```
+* **Response**: `text/event-stream` (Subject to 10 requests/min/IP rate limiting; streams plain English explanations for source code scripts).
+
+---
+
+## Microcontroller Registry Reference Table
+
+BININO v2.0.0 includes support for 50 distinct microcontroller variants across 14 major chip families:
+
+| Family | MCU ID | Display Name | Bootloader Protocol | Flash Base | Default Flash Size | Common Runtimes |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Espressif** | `esp32` | ESP32 (Xtensa dual-core) | SLIP | `0x0` | 4 MB | micropython, circuitpython, nodemcu, espruino, at-firmware, compiled |
+| | `esp32s2` | ESP32-S2 (Xtensa single) | SLIP | `0x0` | 4 MB | micropython, circuitpython, nodemcu, espruino, at-firmware, compiled |
+| | `esp32s3` | ESP32-S3 (Xtensa dual) | SLIP | `0x0` | 8 MB | micropython, circuitpython, nodemcu, espruino, at-firmware, compiled |
+| | `esp32c3` | ESP32-C3 (RISC-V) | SLIP | `0x0` | 4 MB | micropython, compiled |
+| | `esp32c6` | ESP32-C6 (RISC-V) | SLIP | `0x0` | 4 MB | micropython, compiled |
+| | `esp32h2` | ESP32-H2 (RISC-V) | SLIP | `0x0` | 4 MB | micropython, compiled |
+| | `esp8266` | ESP8266 (Xtensa) | SLIP | `0x0` | 4 MB | micropython, nodemcu, espruino, at-firmware, compiled |
+| **AVR** | `atmega328p` | ATmega328P (Arduino Uno/Nano) | STK500v1 | `0x0` | 32 KB | compiled |
+| | `atmega2560` | ATmega2560 (Arduino Mega) | STK500v2 | `0x0` | 256 KB | compiled |
+| | `atmega32u4` | ATmega32U4 (Leonardo/Micro) | AVR109 | `0x0` | 32 KB | compiled |
+| | `attiny85` | ATtiny85 | STK500v1 | `0x0` | 8 KB | compiled |
+| | `attiny45` | ATtiny45 | STK500v1 | `0x0` | 4 KB | compiled |
+| | `atmega4809` | ATmega4809 (Nano Every) | UPDI | `0x0` | 48 KB | compiled |
+| **STM32** | `stm32f1` | STM32F1xx (Blue Pill) | STM32-UART | `0x08000000` | 64 KB | micropython, espruino, elua, forth, rtos-riot, zephyr, compiled |
+| | `stm32f4` | STM32F4xx (Black Pill) | STM32-UART | `0x08000000` | 512 KB | micropython, espruino, elua, forth, rtos-riot, zephyr, compiled |
+| | `stm32l0` | STM32L0xx | STM32-UART | `0x08000000` | 64 KB | compiled |
+| | `stm32l4` | STM32L4xx | STM32-UART | `0x08000000` | 262 KB | micropython, espruino, elua, forth, rtos-riot, zephyr, compiled |
+| | `stm32g0` | STM32G0xx | STM32-UART | `0x08000000` | 131 KB | micropython, espruino, elua, forth, rtos-riot, zephyr, compiled |
+| | `stm32g4` | STM32G4xx | STM32-UART | `0x08000000` | 262 KB | micropython, espruino, elua, forth, rtos-riot, zephyr, compiled |
+| | `stm32h7` | STM32H7xx | STM32-UART | `0x08000000` | 1 MB | micropython, espruino, elua, forth, rtos-riot, zephyr, compiled |
+| | `gd32f1` | GD32F103 (STM32 clone) | STM32-UART | `0x08000000` | 64 KB | compiled |
+| **RP-series** | `rp2040` | RP2040 (Raspberry Pi Pico) | PICOTOOL | `0x10000000` | 2 MB | micropython, circuitpython, compiled |
+| | `rp2350` | RP2350 (Pico 2) | PICOTOOL | `0x10000000` | 4 MB | micropython, circuitpython, compiled |
+| **SAMD** | `samd21` | SAMD21 (Arduino Zero, MKR) | BOSSA | `0x0` | 256 KB | circuitpython, openmv, espruino, compiled |
+| | `samd51` | SAMD51 (Adafruit M4) | BOSSA | `0x0` | 512 KB | circuitpython, openmv, espruino, compiled |
+| **Nordic nRF** | `nrf52840` | nRF52840 | NRF-DFU | `0x0` | 1 MB | circuitpython, espruino, compiled |
+| | `nrf52833` | nRF52833 | NRF-DFU | `0x0` | 512 KB | circuitpython, espruino, compiled |
+| | `nrf51822` | nRF51822 | NRF-DFU | `0x0` | 256 KB | compiled |
+| **NXP LPC** | `lpc1768` | LPC1768 (mbed) | LPC-ISP | `0x0` | 512 KB | compiled, forth |
+| | `lpc1114` | LPC1114 (M0) | LPC-ISP | `0x0` | 32 KB | compiled |
+| | `lpc54608` | LPC54608 | LPC-ISP | `0x0` | 512 KB | compiled |
+| | `mimxrt1060` | iMX RT1060 (Teensy 4.x) | HID-DFU | `0x60000000` | 2 MB | circuitpython, micropython, compiled |
+| **TI MSP430** | `msp430g2` | MSP430G2 | TI-BSL | `0xc000` | 16 KB | compiled |
+| | `msp430f5` | MSP430F5xx | TI-BSL | `0x8000` | 128 KB | compiled |
+| | `msp430fr5` | MSP430FR5xx FRAM | TI-BSL | `0x8000` | 64 KB | compiled |
+| **WCH** | `ch32v003` | CH32V003 | WCH-ISP | `0x8000000` | 16 KB | compiled |
+| | `ch32v203` | CH32V203 | WCH-ISP | `0x8000000` | 64 KB | compiled |
+| | `ch552` | CH552 (8051) | WCH-ISP | `0x0` | 16 KB | compiled |
+| | `ch554` | CH554 (8051) | WCH-ISP | `0x0` | 16 KB | compiled |
+| **Microchip PIC** | `pic16f` | PIC16F | ICSP | `0x0` | 14 KB | compiled |
+| | `pic18f` | PIC18F | ICSP | `0x0` | 32 KB | compiled |
+| | `pic32mx` | PIC32MX (MIPS) | ICSP | `0x1fc00000` | 512 KB | compiled |
+| **Renesas** | `rl78` | Renesas RL78 | RENESAS-UART | `0x0` | 64 KB | compiled |
+| | `rx65n` | Renesas RX65N | RENESAS-UART | `0xffe00000` | 1 MB | compiled |
+| | `ra4m1` | Renesas RA4M1 | RENESAS-UART | `0x0` | 256 KB | compiled |
+| **Silicon Labs** | `efm32gg` | EFM32 Giant Gecko | XMODEM-UART | `0x0` | 1 MB | compiled |
+| | `efm32tg` | EFM32 Tiny Gecko | XMODEM-UART | `0x0` | 32 KB | compiled |
+| **Infineon XMC** | `xmc1100` | XMC1100 (M0) | UART-BSL | `0x10001000` | 64 KB | compiled |
+| | `xmc4700` | XMC4700 (M4) | UART-BSL | `0xc000000` | 2 MB | compiled |
+| **GigaDevice RISC-V** | `gd32vf103` | GD32VF103 (Longan Nano) | DFU-USB | `0x8000000` | 128 KB | compiled |
 
 ---
 
@@ -252,6 +402,8 @@ If you do not have microcontrollers or a Ghidra environment set up, you can run 
 6. Click **View in Code Explorer** to open the IDE layout.
 7. Click **Explain** on any function to watch the typewriter effect stream pre-written analyses.
 8. Click **Export Report** to compile and save the offline decompiler HTML report.
+9. **Simulate Runtime Detection**: When establishing a bridge in Demo Mode, the detector simulates a MicroPython serial banner. It offers an immediate recommendation to jump to the **File Browser** layout.
+10. **Browse Simulated Files**: Under the **File Browser** tab, click files in the tree to view their source code, run AI explanations on the scripts, execute mock command queries via the REPL input console, or download the workspace as a ZIP archive.
 
 ---
 
@@ -276,14 +428,16 @@ binino/
 │   │   ├── picotool.py            # Picotool USB MSD copy bridge
 │   │   └── xmodem_uart.py         # EFM32 XMODEM-CRC protocol
 │   ├── registry/
-│   │   └── mcu_registry.py        # 36 MCU variant registry database
+│   │   └── mcu_registry.py        # Complete 50 MCU variant registry database
 │   ├── routes/
 │   │   ├── mcu.py                 # Registry list API route
 │   │   ├── upload.py              # Multipart firmware uploads route
 │   │   ├── analyze.py             # Ghidra analysis and SSE progress route
+│   │   ├── detect.py              # [NEW] Smart runtime detection route
 │   │   └── explain.py             # Anthropic Claude API explain route
 │   ├── services/
 │   │   ├── job_manager.py         # Job tracking and folder cleanup service
+│   │   ├── runtime_detector.py    # [NEW] Signature evaluation and filesystem commands mapper
 │   │   └── ghidra_runner.py       # Subprocess invocation and log parser
 │   ├── ExportDecompiled.java      # Headless Ghidra decompiler exporter script
 │   ├── main.py                    # FastAPI application initialization
@@ -299,6 +453,7 @@ binino/
 │   ├── hooks/
 │   │   ├── useSerialPort.ts       # Web Serial bridge state hook
 │   │   ├── useFlashExtractor.ts   # esptool ROM extraction protocol hook
+│   │   ├── useSmartDetect.ts      # [NEW] Port prober and environment signature check hook
 │   │   ├── useBackendHandoff.ts   # API handoff and SSE progress hook
 │   │   ├── useCodeExplorer.ts     # Code Explorer coordination hook
 │   │   └── useAIExplain.ts        # Claude AI streaming hook
@@ -320,6 +475,12 @@ binino/
 │   │   │   └── index.tsx          # FAQ items and list wrapper
 │   │   ├── UserManual/            # Interactive user operations manual
 │   │   │   └── index.tsx          # Detailed hardware and setup instructions
+│   │   ├── FileBrowser/           # [NEW] File browser workspace layout
+│   │   │   ├── index.tsx          # Master browser shell pane routing
+│   │   │   ├── FileTree.tsx       # Directory tree navigation & CircuitPython local mount picker
+│   │   │   ├── FileViewer.tsx     # Syntax editor view and AI code explanation assistant
+│   │   │   ├── ReplPassthrough.tsx # Terminal console execution command passthrough
+│   │   │   └── RuntimeBadge.tsx   # Environment visual display badge
 │   │   └── CodeExplorer/          # Three-pane Code Explorer IDE
 │   │       ├── ErrorBoundary.tsx  # React Error Boundary crash layouts
 │   │       ├── GlobalSearch.tsx   # Ctrl+K fuzzy symbol locator
@@ -331,8 +492,10 @@ binino/
 │   ├── index.css                  # Core CSS and design style definitions
 │   └── main.tsx                   # React root entry point
 ├── package.json                   # Build configs and script dependencies
-├── vite.config.ts                 # Dev server configuration
-└── tsconfig.json                  # TypeScript compiler settings
+├── postcss.config.js              # PostCSS configuration file
+├── tailwind.config.js             # Tailwind CSS custom presets
+├── tsconfig.json                  # TypeScript compiler rules
+└── vite.config.ts                 # Vite bundler options
 ```
 
 ---

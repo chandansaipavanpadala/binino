@@ -3,42 +3,75 @@ import { useAppContext } from '../context/AppContext';
 
 
 export const WorkflowStepper: React.FC = () => {
-  const { connectionStatus, extractionStatus, result } = useAppContext();
+  const { connectionStatus, extractionStatus, result, recommendedAction, forceBinaryExtraction } = useAppContext();
 
   const isBridgeDone = connectionStatus === 'connected';
   const isExtractDone = extractionStatus === 'done';
   const isAnalyseDone = !!result;
 
-  const steps = [
-    {
-      id: 'bridge',
-      label: 'Bridge',
-      desc: 'Hardware Serial Connection',
-      isActive: connectionStatus !== 'connected',
-      isCompleted: isBridgeDone,
-    },
-    {
-      id: 'extract',
-      label: 'Extract',
-      desc: 'Flash ROM Extraction',
-      isActive: connectionStatus === 'connected' && extractionStatus !== 'done',
-      isCompleted: isExtractDone,
-    },
-    {
-      id: 'analyse',
-      label: 'Analyse',
-      desc: 'Ghidra Decompilation',
-      isActive: extractionStatus === 'done' && !result,
-      isCompleted: isAnalyseDone,
-    },
-    {
-      id: 'explore',
-      label: 'Explore',
-      desc: 'Interactive Decompiler Explorer',
-      isActive: !!result,
-      isCompleted: false, // Remains interactive / target
-    },
-  ];
+  const isInterpreted = connectionStatus === 'connected' && recommendedAction === 'file-browser' && !forceBinaryExtraction;
+
+  const steps = isInterpreted
+    ? [
+        {
+          id: 'bridge',
+          label: 'Bridge',
+          desc: 'Hardware Serial Connection',
+          isActive: false,
+          isCompleted: true,
+        },
+        {
+          id: 'browse',
+          label: 'Browse',
+          desc: 'Interpreted File Tree',
+          isActive: true,
+          isCompleted: false,
+        },
+        {
+          id: 'explain',
+          label: 'Explain',
+          desc: 'AI Source Explanations',
+          isActive: false,
+          isCompleted: false,
+        },
+        {
+          id: 'export',
+          label: 'Export',
+          desc: 'Download Script Zips',
+          isActive: false,
+          isCompleted: false,
+        },
+      ]
+    : [
+        {
+          id: 'bridge',
+          label: 'Bridge',
+          desc: 'Hardware Serial Connection',
+          isActive: connectionStatus !== 'connected',
+          isCompleted: isBridgeDone,
+        },
+        {
+          id: 'extract',
+          label: 'Extract',
+          desc: 'Flash ROM Extraction',
+          isActive: connectionStatus === 'connected' && extractionStatus !== 'done',
+          isCompleted: isExtractDone,
+        },
+        {
+          id: 'analyse',
+          label: 'Analyse',
+          desc: 'Ghidra Decompilation',
+          isActive: extractionStatus === 'done' && !result,
+          isCompleted: isAnalyseDone,
+        },
+        {
+          id: 'explore',
+          label: 'Explore',
+          desc: 'Interactive Decompiler Explorer',
+          isActive: !!result,
+          isCompleted: false,
+        },
+      ];
 
   return (
     <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between w-full p-2 rounded-lg gap-2 bg-[#111111]" style={{ border: '1px solid var(--border-subtle)' }}>

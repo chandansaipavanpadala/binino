@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { useSerialPort } from '../hooks/useSerialPort';
 import { useFlashExtractor } from '../hooks/useFlashExtractor';
 import { useBackendHandoff } from '../hooks/useBackendHandoff';
+import { useSmartDetect, DetectStatus, Confidence, RecommendedAction, FilesystemCommands } from '../hooks/useSmartDetect';
 import type { AnalysisResult } from '../types/analysis';
 import type { ConnectionStatus, TerminalLog, PortMetadata } from '../hooks/useSerialPort';
 import type { ExtractionStatus } from '../hooks/useFlashExtractor';
@@ -54,6 +55,24 @@ interface AppContextValue {
   cancelHandoff: () => void;
   resetHandoff: () => void;
 
+  // Detection
+  detectStatus: DetectStatus;
+  detectedRuntime: string;
+  runtimeVersion: string | null;
+  confidence: Confidence;
+  recommendedAction: RecommendedAction;
+  detectionMessage: string;
+  filesystemCommands: FilesystemCommands | null;
+  forceBinaryExtraction: boolean;
+  setForceBinaryExtraction: (v: boolean) => void;
+  runDetection: (
+    port: SerialPort | null,
+    arch: string,
+    isDemoMode: boolean,
+    appendLog: (level: 'INFO' | 'WARN' | 'ERROR' | 'DATA', msg: string) => void
+  ) => Promise<any>;
+  resetDetection: () => void;
+
   // App-level
   isDemoMode: boolean;
   setIsDemoMode: (v: boolean) => void;
@@ -71,8 +90,10 @@ export const useAppContext = (): AppContextValue => {
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const serial = useSerialPort();
+  const smartDetect = useSmartDetect();
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [isExplorerOpen, setIsExplorerOpen] = useState(false);
+  const [forceBinaryExtraction, setForceBinaryExtraction] = useState(false);
 
   const handleExtractionDone = useCallback((buffer: Uint8Array) => {
     serial.appendLog('INFO', `Flash image complete (${buffer.length} bytes). Handoff pipeline unlocked.`);
@@ -97,6 +118,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isDemoMode,
   });
 
+  // Automatically trigger smart detection on connection
+  useEffect(() => {
+    if (serial.connectionStatus === 'connected') {
+      const triggerDetect = async () => {
+        setForceBinaryExtraction(false);
+        // Pause background reading to gain exclusive port access
+        await serial.pauseReadLoop();
+
+        const res = await smartDetect.runDetection(
+          serial.portRef.current,
+          serial.selectedArch,
+          isDemoMode,
+          serial.appendLog
+        );
+
+        // Resume read loop if the recommended action is not file-browser
+        if (res && res.action !== 'file-browser') {
+          serial.resumeReadLoop();
+        }
+      };
+
+      triggerDetect();
+    } else if (serial.connectionStatus === 'idle') {
+      smartDetect.resetDetection();
+      setForceBinaryExtraction(false);
+    }
+  }, [serial.connectionStatus, serial.selectedArch, isDemoMode]);
+
   // Sync Demo Mode with serial bridge state
   useEffect(() => {
     if (isDemoMode) {
@@ -111,7 +160,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       serial.setConnectionTimestamp(now);
       serial.setTerminalLogs([
         { id: 'demo-1', timestamp: now, level: 'INFO', message: 'Hardware emulation active: Demo Mode enabled.' },
-        { id: 'demo-2', timestamp: now, level: 'INFO', message: 'Click "Extract Firmware" to trigger a simulated 1024-byte block ROM backup read sequence.' },
+        { id: 'demo-2', timestamp: now, level: 'INFO', message: 'Smart Detector will auto-probe when connected.' },
       ]);
     } else {
       serial.setConnectionStatus('idle');
@@ -119,6 +168,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       serial.setConnectionTimestamp(null);
       serial.setTerminalLogs([]);
       handoff.resetHandoff();
+      smartDetect.resetDetection();
+      setForceBinaryExtraction(false);
     }
   }, [isDemoMode]);
 
@@ -142,6 +193,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     sendToServer: handoff.sendToServer,
     cancelHandoff: handoff.cancelHandoff,
     resetHandoff: handoff.resetHandoff,
+    
+    // Detection
+    detectStatus: smartDetect.detectStatus,
+    detectedRuntime: smartDetect.detectedRuntime,
+    runtimeVersion: smartDetect.runtimeVersion,
+    confidence: smartDetect.confidence,
+    recommendedAction: smartDetect.recommendedAction,
+    detectionMessage: smartDetect.detectionMessage,
+    filesystemCommands: smartDetect.filesystemCommands,
+    forceBinaryExtraction,
+    setForceBinaryExtraction,
+    runDetection: smartDetect.runDetection,
+    resetDetection: smartDetect.resetDetection,
+
     isDemoMode,
     setIsDemoMode,
     isExplorerOpen,

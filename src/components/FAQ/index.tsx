@@ -40,6 +40,18 @@ const faqData = [
     a: 'AI Explain sends the pseudo-C code of a selected function to the Anthropic Claude API and streams back a plain-English explanation of what the firmware function does. This requires an ANTHROPIC_API_KEY configured in the backend .env file.',
   },
   {
+    q: 'What are interpreted runtimes on microcontrollers?',
+    a: 'Interpreted runtimes (like MicroPython, CircuitPython, NodeMCU Lua, and Espruino JavaScript) run plain-text scripts directly from a flash file system instead of executing pre-compiled binary machine code. BININO detects these and launches the File Browser so you can inspect script files directly rather than extracting the huge compiled runtime interpreter binary.',
+  },
+  {
+    q: 'How does Smart Runtime Detection work?',
+    a: 'Upon connection, BININO pauses the terminal logger and writes short probe sequences (like REPL reset keys Ctrl+C/Ctrl+D, Lua triggers, JS queries, and AT synchronization requests) to the serial TX line. It listens to the incoming RX line for 3 seconds. The decoded traffic is sent to the backend endpoint, which runs a regex signature match to recognize the runtime environment.',
+  },
+  {
+    q: 'Is script code sent to the AI secure?',
+    a: 'Yes. When you click \'Explain script\' in the File Browser, only the specific file script text you are currently viewing is transmitted to the Anthropic API via your local FastAPI server. The rest of the filesystem remains entirely offline.',
+  },
+  {
     q: 'Is BININO open source?',
     a: 'Yes. BININO is fully open-source and available on GitHub at github.com/chandansaipavanpadala/binino. Contributions, issues, and pull requests are welcome.',
   },

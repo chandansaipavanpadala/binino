@@ -4,6 +4,7 @@ import { ExtractionStatus } from '../hooks/useFlashExtractor';
 import { ExtractionPanel } from './ExtractionPanel';
 import { RefreshCw, Play, Square, AlertTriangle } from 'lucide-react';
 import { MCU_REGISTRY, MCUProfile } from '../utils/mcuRegistry';
+import { useAppContext } from '../context/AppContext';
 
 interface ConnectionPanelProps {
   connectionStatus: ConnectionStatus;
@@ -59,6 +60,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   const isConnected = connectionStatus === 'connected';
   const isConnecting = connectionStatus === 'connecting';
 
+  const { detectStatus, detectionMessage } = useAppContext();
   const [mcuList, setMcuList] = useState<Record<string, MCUProfile>>(MCU_REGISTRY);
 
   // Fetch MCU registry dynamically from backend, fall back to local import on error
@@ -102,6 +104,9 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   };
   
   const getStatusDetails = () => {
+    if (connectionStatus === 'connected' && detectStatus === 'probing') {
+      return { label: 'Probing...', color: 'var(--status-warn)' };
+    }
     switch (connectionStatus) {
       case 'connected':
         return { label: 'Live', color: 'var(--status-live)' };
@@ -240,6 +245,19 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
               >
                 <span className="block font-semibold uppercase tracking-wider text-[9px] mb-1 text-amber-500">Bootloader Note</span>
                 {selectedMcu.bootloader_note}
+              </div>
+            )}
+
+            {/* Smart Detection Probing Status */}
+            {isConnected && detectStatus === 'probing' && (
+              <div 
+                className="flex items-center space-x-2.5 p-3 rounded text-[11px] font-sans bg-amber-500/5 border border-amber-500/20 text-[#E0E0E0]"
+              >
+                <RefreshCw className="h-4 w-4 animate-spin text-amber-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <span className="block font-semibold uppercase tracking-wider text-[9px] text-amber-500 mb-0.5">Smart Probing Active</span>
+                  <p className="truncate text-[#CCCCCC]">{detectionMessage || 'Testing REPL, Lua, JS and AT prompts...'}</p>
+                </div>
               </div>
             )}
 

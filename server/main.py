@@ -4,7 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from server.routes import upload, analyze, explain, mcu
+from server.routes import upload, analyze, explain, mcu, detect
 from server.services.job_manager import job_manager
 
 
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Binino Backend Handoff Server",
     description="Python API bridging raw binary firmware uploads and Ghidra decompilation",
-    version="0.1.0",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -62,8 +62,9 @@ app.include_router(upload.router)
 app.include_router(analyze.router)
 app.include_router(explain.router)
 app.include_router(mcu.router)
+app.include_router(detect.router)
 
 
 @app.get("/")
 def read_root():
-    return {"name": "Binino API", "version": "0.1.0-alpha", "status": "online"}
+    return {"name": "Binino API", "version": "2.0.0", "status": "online"}

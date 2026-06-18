@@ -2,6 +2,7 @@ import React from 'react';
 import { ConnectionStatus, PortMetadata } from '../hooks/useSerialPort';
 import { Info } from 'lucide-react';
 import { MCU_REGISTRY } from '../utils/mcuRegistry';
+import { useAppContext } from '../context/AppContext';
 
 interface DeviceInfoCardProps {
   connectionStatus: ConnectionStatus;
@@ -25,6 +26,7 @@ export const DeviceInfoCard: React.FC<DeviceInfoCardProps> = ({
   const isConnected = connectionStatus === 'connected';
   const isCollapsed = !isExpanded;
 
+  const { detectStatus, detectedRuntime, runtimeVersion, confidence, extractionStatus } = useAppContext();
   const selectedMcu = MCU_REGISTRY[selectedArch];
   const protocol = selectedMcu ? selectedMcu.protocol : '—';
 
@@ -49,6 +51,11 @@ export const DeviceInfoCard: React.FC<DeviceInfoCardProps> = ({
           <h2 className="text-xs font-semibold tracking-wider uppercase" style={{ color: 'var(--text-secondary)' }}>
             Device Metadata
           </h2>
+          {isConnected && (extractionStatus === 'syncing' || extractionStatus === 'reading' || detectedRuntime === 'bootloader') && (
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30 animate-pulse">
+              BOOTLOADER MODE
+            </span>
+          )}
         </div>
 
         {/* Collapse/Expand Toggle chevron trigger */}
@@ -113,6 +120,22 @@ export const DeviceInfoCard: React.FC<DeviceInfoCardProps> = ({
               {isConnected && connectionTimestamp ? connectionTimestamp : '—'}
             </span>
           </div>
+          {isConnected && detectStatus === 'detected' && detectedRuntime !== 'compiled' && (
+            <>
+              <div>
+                <span className="block mb-0.5 text-[10px] uppercase tracking-wider font-mono" style={{ color: 'var(--text-muted)' }}>Runtime</span>
+                <span className="font-mono block font-semibold text-amber-500 uppercase tracking-wide">
+                  {detectedRuntime} {runtimeVersion ? `v${runtimeVersion}` : ''}
+                </span>
+              </div>
+              <div>
+                <span className="block mb-0.5 text-[10px] uppercase tracking-wider font-mono" style={{ color: 'var(--text-muted)' }}>Confidence</span>
+                <span className="font-mono block uppercase text-[10px] font-semibold" style={{ color: confidence === 'high' ? 'var(--status-live)' : confidence === 'medium' ? 'var(--status-warn)' : 'var(--status-error)' }}>
+                  {confidence}
+                </span>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

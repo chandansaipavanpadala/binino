@@ -65,6 +65,8 @@ class MCUProfileModel(BaseModel):
     requires_tool: Optional[str] = None
     read_protected: bool = False
     supported: bool = True
+    common_runtimes: Optional[List[str]] = []
+    detection_notes: Optional[str] = ""
 
 class MCUListResponse(BaseModel):
     mcus: Dict[str, MCUProfileModel]
