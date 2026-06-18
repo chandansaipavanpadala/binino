@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSerialPort } from './hooks/useSerialPort';
 import { useFlashExtractor } from './hooks/useFlashExtractor';
+import { useBackendHandoff } from './hooks/useBackendHandoff';
 import { Navbar } from './components/Navbar';
 import { ConnectionPanel } from './components/ConnectionPanel';
 import { DeviceInfoCard } from './components/DeviceInfoCard';
+import { HandoffPanel } from './components/HandoffPanel';
 import { TerminalPane } from './components/TerminalPane';
 import { HexPreviewStrip } from './components/HexPreviewStrip';
 import { AlertTriangle, AlertCircle } from 'lucide-react';
@@ -67,8 +69,14 @@ const App: React.FC = () => {
       setPortInfo(null);
       setConnectionTimestamp(null);
       setTerminalLogs([]);
+      resetHandoff(); // Clear handoff panel states
     }
   }, [isDemoMode, setConnectionStatus, setPortInfo, setConnectionTimestamp, setTerminalLogs]);
+
+  // Callback triggered when flash extraction completes
+  const handleExtractionDone = useCallback((buffer: Uint8Array) => {
+    appendLog('INFO', `Flash image complete (${buffer.length} bytes). Handoff pipeline unlocked.`);
+  }, [appendLog]);
 
   // Instantiate Flash Extractor Logic Hook
   const {
@@ -77,7 +85,7 @@ const App: React.FC = () => {
     totalBytes,
     progressPercent,
     flashBuffer,
-    errorMessage,
+    errorMessage: extractionError,
     startExtraction,
     cancelExtraction,
     downloadBin,
@@ -88,6 +96,26 @@ const App: React.FC = () => {
     resumeReadLoop,
     connectionStatus,
     selectedArch,
+    isDemoMode,
+    onExtractionDone: handleExtractionDone,
+  });
+
+  // Instantiate Backend Decompiler Handoff Hook
+  const {
+    uploadStatus,
+    uploadProgress,
+    analysisProgress,
+    analysisStage,
+    result,
+    errorMessage: handoffError,
+    sendToServer,
+    cancelHandoff,
+    resetHandoff,
+  } = useBackendHandoff({
+    flashBuffer,
+    extractionStatus,
+    selectedArch,
+    appendLog,
     isDemoMode,
   });
 
@@ -112,12 +140,12 @@ const App: React.FC = () => {
         )}
 
         {/* Global Error Banner */}
-        {(errorMsg || errorMessage) && (
+        {(errorMsg || extractionError || handoffError) && (
           <div className="bg-[#FF4C4C]/10 border border-[#FF4C4C] rounded-lg p-4 flex items-start space-x-3 text-slate-200">
             <AlertCircle className="h-5 w-5 text-[#FF4C4C] shrink-0 mt-0.5" />
             <div>
               <h3 className="text-sm font-semibold text-[#FF4C4C]">Hardware Bridge Error</h3>
-              <p className="text-xs text-slate-300 mt-1">{errorMsg || errorMessage}</p>
+              <p className="text-xs text-slate-300 mt-1">{errorMsg || extractionError || handoffError}</p>
             </div>
           </div>
         )}
@@ -153,6 +181,21 @@ const App: React.FC = () => {
               selectedBaud={selectedBaud}
               connectionTimestamp={connectionTimestamp}
             />
+
+            {/* Handoff Panel: Enabled only when firmware extraction completes */}
+            {extractionStatus === 'done' && (
+              <HandoffPanel
+                uploadStatus={uploadStatus}
+                uploadProgress={uploadProgress}
+                analysisProgress={analysisProgress}
+                analysisStage={analysisStage}
+                result={result}
+                errorMessage={handoffError}
+                sendToServer={sendToServer}
+                cancelHandoff={cancelHandoff}
+                flashSize={flashBuffer ? flashBuffer.length : 0}
+              />
+            )}
           </section>
 
           {/* Right Column: Terminal Stream & Hex Dump (70% on desktop) */}

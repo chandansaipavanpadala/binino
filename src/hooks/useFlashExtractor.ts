@@ -11,6 +11,7 @@ interface UseFlashExtractorProps {
   connectionStatus: ConnectionStatus;
   selectedArch: string;
   isDemoMode: boolean;
+  onExtractionDone?: (buffer: Uint8Array) => void;
 }
 
 /**
@@ -25,6 +26,7 @@ export const useFlashExtractor = ({
   connectionStatus,
   selectedArch,
   isDemoMode,
+  onExtractionDone,
 }: UseFlashExtractorProps) => {
   const [extractionStatus, setExtractionStatus] = useState<ExtractionStatus>('idle');
   const [bytesRead, setBytesRead] = useState<number>(0);
@@ -410,7 +412,9 @@ export const useFlashExtractor = ({
       setExtractionStatus('done');
       appendLog('INFO', `Extraction complete. ${targetSize} bytes read. Binary ready for download.`);
       
-      // PHASE 3: Backend Handoff — send flashBuffer to server here
+      if (onExtractionDone) {
+        onExtractionDone(tempBuffer);
+      }
       return;
     }
 
@@ -476,7 +480,9 @@ export const useFlashExtractor = ({
       setExtractionStatus('done');
       appendLog('INFO', `Extraction complete. ${targetSize} bytes read. Binary ready for download.`);
       
-      // PHASE 3: Backend Handoff — send flashBuffer to server here
+      if (onExtractionDone) {
+        onExtractionDone(buffer);
+      }
 
     } catch (err: any) {
       console.error(err);
