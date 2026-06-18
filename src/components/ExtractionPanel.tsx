@@ -16,6 +16,7 @@ interface ExtractionPanelProps {
   cancelExtraction: () => void;
   startExtraction: (arch: string, targetSize: number) => Promise<void>;
   flashBuffer: Uint8Array | null;
+  isBrowserSupported?: boolean;
 }
 
 export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
@@ -30,6 +31,7 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
   cancelExtraction,
   startExtraction,
   flashBuffer,
+  isBrowserSupported = true,
 }) => {
   const [selectedSize, setSelectedSize] = useState<number>(0x400000); // Default 4MB
 
@@ -63,7 +65,7 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
   const isConnected = connectionStatus === 'connected';
 
   // Toggle button availability
-  const isExtractDisabled = (!isConnected && !isDemoMode) || isRunning;
+  const isExtractDisabled = (!isConnected && !isDemoMode) || isRunning || !isBrowserSupported;
 
   // Format size dropdown choices
   const sizeOptions = [
@@ -141,7 +143,7 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
           value={selectedSize}
           onChange={(e) => setSelectedSize(Number(e.target.value))}
           disabled={isRunning}
-          className="w-full h-10 px-3 py-2 bg-[#0A0A0F] border border-[#1E1E2E] rounded-md text-sm text-slate-200 focus:outline-none focus:border-[#00FFC8] focus:ring-1 focus:ring-[#00FFC8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full h-10 px-3 py-2 bg-[#0A0A0F] border border-[#1E1E2E] rounded-md text-[13px] font-sans text-slate-200 focus:outline-none focus:border-[#00FFC8] focus:ring-1 focus:ring-[#00FFC8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {sizeOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -154,14 +156,19 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
       {/* Control Buttons */}
       <div className="flex flex-col space-y-2">
         {!isRunning ? (
-          <button
-            onClick={() => startExtraction(selectedArch, selectedSize)}
-            disabled={isExtractDisabled}
-            className="w-full h-10 flex items-center justify-center space-x-2 text-sm font-semibold rounded-md bg-[#00FFC8] text-[#0A0A0F] hover:bg-[#00E0B0] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          <div
+            title={!isBrowserSupported ? "Web Serial API is not supported in this browser. Please use Chrome, Edge, or Opera." : undefined}
+            className="w-full"
           >
-            <Download className="h-4 w-4" />
-            <span>Extract Firmware</span>
-          </button>
+            <button
+              onClick={() => startExtraction(selectedArch, selectedSize)}
+              disabled={isExtractDisabled}
+              className="w-full h-10 flex items-center justify-center space-x-2 text-sm font-semibold rounded-md bg-[#00FFC8] text-[#0A0A0F] hover:bg-[#00E0B0] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 active:scale-[0.98] focus-visible:ring-1 focus-visible:ring-[#00FFC8] focus-visible:outline-none"
+            >
+              <Download className="h-4 w-4" />
+              <span>Extract Firmware</span>
+            </button>
+          </div>
         ) : (
           <button
             onClick={cancelExtraction}

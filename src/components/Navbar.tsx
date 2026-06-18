@@ -33,7 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isDemoMode, setIsDemoMode }) => 
         </button>
 
         <span className="px-2.5 py-1 text-xs font-mono font-medium rounded-full bg-[#1E1E2E] text-[#FFB347] border border-[#1E1E2E]">
-          v0.1.0-alpha
+          v1.0.0
         </span>
       </div>
     </header>

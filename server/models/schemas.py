@@ -42,3 +42,11 @@ class AnalysisResultResponse(BaseModel):
     raw_assembly_snippet: str
     simulated: Optional[bool] = None
 
+class ExplainRequest(BaseModel):
+    function_name: str
+    arch: str
+    pseudo_c: str
+    context_strings: List[str] = []
+    context_symbols: List[str] = []
+
+

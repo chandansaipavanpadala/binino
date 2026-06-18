@@ -10,6 +10,7 @@ import { TerminalPane } from './components/TerminalPane';
 import { HexPreviewStrip } from './components/HexPreviewStrip';
 import { AlertTriangle, AlertCircle } from 'lucide-react';
 import { CodeExplorer } from './components/CodeExplorer';
+import { ErrorBoundary } from './components/CodeExplorer/ErrorBoundary';
 
 const App: React.FC = () => {
   const {
@@ -49,7 +50,8 @@ const App: React.FC = () => {
         usbVendorId: 0x1A86,
         usbProductId: 0x7523,
       });
-      const now = new Date().toTimeString().split(' ')[0];
+      const d = new Date();
+      const now = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}.${d.getMilliseconds().toString().padStart(3, '0')}`;
       setConnectionTimestamp(now);
       
       setTerminalLogs([
@@ -174,6 +176,7 @@ const App: React.FC = () => {
               cancelExtraction={cancelExtraction}
               startExtraction={startExtraction}
               flashBuffer={flashBuffer}
+              isBrowserSupported={isBrowserSupported}
             />
             
             <DeviceInfoCard
@@ -223,11 +226,17 @@ const App: React.FC = () => {
         Binino Toolkit — Browser-to-Hardware Flash Extractor (Phase 2)
       </footer>
       {isExplorerOpen && result && (
-        <CodeExplorer
-          result={result}
-          flashBuffer={flashBuffer}
+        <ErrorBoundary
           onClose={() => setIsExplorerOpen(false)}
-        />
+          onCrash={(error) => appendLog('ERROR', `Code Explorer crashed: ${error.message}`)}
+        >
+          <CodeExplorer
+            result={result}
+            flashBuffer={flashBuffer}
+            onClose={() => setIsExplorerOpen(false)}
+            isDemoMode={isDemoMode}
+          />
+        </ErrorBoundary>
       )}
     </div>
   );

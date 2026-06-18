@@ -23,6 +23,7 @@ interface ConnectionPanelProps {
   cancelExtraction: () => void;
   startExtraction: (arch: string, targetSize: number) => Promise<void>;
   flashBuffer: Uint8Array | null;
+  isBrowserSupported?: boolean;
 }
 
 export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
@@ -43,6 +44,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   cancelExtraction,
   startExtraction,
   flashBuffer,
+  isBrowserSupported = true,
 }) => {
   
   // Map connection states to readable labels and dot color classes
@@ -96,7 +98,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
               value={selectedArch}
               onChange={(e) => setSelectedArch(e.target.value)}
               disabled={isConnected || isConnecting}
-              className="w-full h-10 px-3 py-2 bg-[#0A0A0F] border border-[#1E1E2E] rounded-md text-sm text-slate-200 focus:outline-none focus:border-[#00FFC8] focus:ring-1 focus:ring-[#00FFC8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full h-10 px-3 py-2 bg-[#0A0A0F] border border-[#1E1E2E] rounded-md text-[13px] font-sans text-slate-200 focus:outline-none focus:border-[#00FFC8] focus:ring-1 focus:ring-[#00FFC8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <option value="esp32">ESP32 (WROOM / WROVER)</option>
               <option value="esp8266">ESP8266 (EX / NodeMCU)</option>
@@ -116,7 +118,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
               value={selectedBaud}
               onChange={(e) => setSelectedBaud(Number(e.target.value))}
               disabled={isConnected || isConnecting}
-              className="w-full h-10 px-3 py-2 bg-[#0A0A0F] border border-[#1E1E2E] rounded-md text-sm text-slate-200 focus:outline-none focus:border-[#00FFC8] focus:ring-1 focus:ring-[#00FFC8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full h-10 px-3 py-2 bg-[#0A0A0F] border border-[#1E1E2E] rounded-md text-[13px] font-sans text-slate-200 focus:outline-none focus:border-[#00FFC8] focus:ring-1 focus:ring-[#00FFC8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <option value="9600">9600 bps</option>
               <option value="57600">57600 bps</option>
@@ -172,6 +174,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
         cancelExtraction={cancelExtraction}
         startExtraction={startExtraction}
         flashBuffer={flashBuffer}
+        isBrowserSupported={isBrowserSupported}
       />
     </div>
   );

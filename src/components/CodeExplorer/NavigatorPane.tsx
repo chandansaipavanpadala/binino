@@ -131,17 +131,19 @@ export const NavigatorPane: React.FC<NavigatorPaneProps> = ({
         </div>
 
         {/* Tab Row Navigation */}
-        <div className="flex bg-[#12121A] p-0.5 rounded border border-[#1E1E2D]">
+        <div className="flex bg-[#12121A] p-0.5 rounded border border-[#1E1E2D]" role="tablist" aria-label="Navigator view tabs">
           {(['functions', 'strings', 'symbols'] as const).map((tab) => {
             const isActive = activeTab === tab;
             return (
               <button
                 key={tab}
+                role="tab"
+                aria-selected={isActive}
                 onClick={() => {
                   setActiveTab(tab);
                   setFilterText('');
                 }}
-                className={`flex-1 py-1 text-[10px] uppercase font-bold tracking-wider rounded transition-all ${
+                className={`flex-1 py-1 text-[10px] uppercase font-bold tracking-wider rounded transition-all focus-visible:ring-1 focus-visible:ring-[#00FFC8] focus-visible:outline-none ${
                   isActive
                     ? 'bg-[#1E1E2E] text-[#00FFC8]'
                     : 'text-[#718096] hover:text-white'
@@ -189,57 +191,69 @@ export const NavigatorPane: React.FC<NavigatorPaneProps> = ({
 
             {/* Virtual Scroll Container */}
             <div className="relative w-full flex-1 overflow-hidden" style={{ minHeight: '150px' }}>
-              <div
-                className="overflow-y-auto h-full w-full"
-                onScroll={handleScroll}
-              >
-                <div
-                  className="w-full relative"
-                  style={{ height: `${virtualFunctions.totalHeight}px` }}
-                >
-                  {virtualFunctions.items.map(({ index, func, top }) => {
-                    const isSelected = activeFunction?.name === func.name;
-                    const isEntry = func.address.toLowerCase() === result.entry_point.toLowerCase();
-                    return (
-                      <div
-                        key={func.name + '-' + index}
-                        className="absolute left-0 right-0 px-2 flex items-center"
-                        style={{ top: `${top}px`, height: `${ROW_HEIGHT}px` }}
-                      >
-                        <button
-                          onClick={() => onSelectFunction(func)}
-                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left transition-all ${
-                            isSelected
-                              ? 'bg-[#1A1A2E] text-[#00FFC8] border border-[#00FFC8]/20'
-                              : 'text-[#A0AEC0] hover:bg-[#12121A] hover:text-white border border-transparent'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="font-mono text-[9px] text-[#00FFC8]/70 bg-[#162725] px-1 rounded flex-shrink-0">
-                              {func.address}
-                            </span>
-                            <span className="font-mono text-xs truncate">
-                              {func.name}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5 flex-shrink-0">
-                            {isEntry && (
-                              <span className="text-[8px] bg-[#1B2D29] text-[#00FFC8] font-bold px-1 rounded border border-[#1E4339]">
-                                ⚑
-                              </span>
-                            )}
-                            {func.size && (
-                              <span className="text-[9px] text-[#4A5568]">
-                                {func.size}B
-                              </span>
-                            )}
-                          </div>
-                        </button>
-                      </div>
-                    );
-                  })}
+              {result.functions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center text-center p-4 h-full space-y-2.5">
+                  <svg className="w-8 h-8 text-slate-600/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="4" y="4" width="16" height="16" rx="2" />
+                    <path d="M9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3" />
+                  </svg>
+                  <p className="text-[11px] text-slate-500 max-w-[170px] leading-relaxed">
+                    No functions identified. The binary may be encrypted, packed, or the wrong architecture was selected.
+                  </p>
                 </div>
-              </div>
+              ) : (
+                <div
+                  className="overflow-y-auto h-full w-full"
+                  onScroll={handleScroll}
+                >
+                  <div
+                    className="w-full relative"
+                    style={{ height: `${virtualFunctions.totalHeight}px` }}
+                  >
+                    {virtualFunctions.items.map(({ index, func, top }) => {
+                      const isSelected = activeFunction?.name === func.name;
+                      const isEntry = func.address.toLowerCase() === result.entry_point.toLowerCase();
+                      return (
+                        <div
+                          key={func.name + '-' + index}
+                          className="absolute left-0 right-0 px-2 flex items-center"
+                          style={{ top: `${top}px`, height: `${ROW_HEIGHT}px` }}
+                        >
+                          <button
+                            onClick={() => onSelectFunction(func)}
+                            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left transition-all ${
+                              isSelected
+                                ? 'bg-[#1A1A2E] text-[#00FFC8] border border-[#00FFC8]/20'
+                                : 'text-[#A0AEC0] hover:bg-[#12121A] hover:text-white border border-transparent'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-mono text-[9px] text-[#00FFC8]/70 bg-[#162725] px-1 rounded flex-shrink-0">
+                                {func.address}
+                              </span>
+                              <span className="font-mono text-xs truncate">
+                                {func.name}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              {isEntry && (
+                                <span className="text-[8px] bg-[#1B2D29] text-[#00FFC8] font-bold px-1 rounded border border-[#1E4339]">
+                                  ⚑
+                                </span>
+                              )}
+                              {func.size && (
+                                <span className="text-[9px] text-[#4A5568]">
+                                  {func.size}B
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

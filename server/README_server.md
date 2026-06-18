@@ -48,3 +48,24 @@ uvicorn server.main:app --reload --port 8000
 ```
 
 The API will bind to `http://localhost:8000`. You can review the interactive OpenAPI documentation by visiting `http://localhost:8000/docs`.
+
+---
+
+## AI Explain Integration (Claude API)
+
+Binino leverages the Anthropic Claude API to provide intelligent, natural language explanations of decompiled pseudo-C functions inside the Code Explorer.
+
+### 1. Configuration
+To use the real Anthropic Claude API, set the `ANTHROPIC_API_KEY` environment variable prior to starting the server:
+
+- **Windows PowerShell**:
+  ```powershell
+  $env:ANTHROPIC_API_KEY="your-api-key-here"
+  ```
+- **Linux / macOS Bash**:
+  ```bash
+  export ANTHROPIC_API_KEY="your-api-key-here"
+  ```
+
+### 2. Simulation Fallback
+If `ANTHROPIC_API_KEY` is not defined, the server automatically defaults to **Simulation Mode**. In this mode, the server streams realistic explanations of common functions (like clock setup, WiFi connect, packet parsing, ADC loops) directly from pre-written templates. This allows full testing and demonstration of the UI's typewriter effect and loading/drawer flows without incurring any real API cost or requiring credentials.

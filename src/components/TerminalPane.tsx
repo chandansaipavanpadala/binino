@@ -49,7 +49,11 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({ logs, clearLogs }) =
       </div>
 
       {/* Terminal logs list */}
-      <div className="flex-1 overflow-y-auto p-4 font-mono text-xs leading-relaxed space-y-1.5 selection:bg-[#00FFC8]/20 selection:text-[#00FFC8]">
+      <div
+        role="log"
+        aria-live="polite"
+        className="flex-1 overflow-y-auto p-4 font-mono text-xs leading-relaxed space-y-1.5 selection:bg-[#00FFC8]/20 selection:text-[#00FFC8]"
+      >
         {logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-1">
             <span className="font-sans">No logs generated. Connect a device to start receiving stream data.</span>

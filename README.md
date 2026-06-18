@@ -1,122 +1,126 @@
 # Binino — Web-Based Firmware Extraction and Reverse Engineering Bridge
 
-Binino is a universal toolkit designed to bridge the gap between compiled microcontroller firmware and high-level readable source code. Operating entirely within the web browser via the Web Serial API, Binino enables hardware analysts and embedded systems engineers to extract binary data directly from connected microcontrollers, monitor live serial output, and analyze the resulting firmware structure without the need for native desktop applications or backend server components.
+Binino is a comprehensive embedded security engineering toolkit that bridges the gap between raw hardware microcontrollers and readable decompiled source code. Operating directly in the browser via the Web Serial API, Binino enables hardware security analysts to extract raw flash firmware, upload it to a local decompilation backend, explore the decompiled function ASTs, and get instant explanations of the decompiled code powered by Claude AI.
 
 ---
 
-## Architecture Overview
+## Technical Architecture & Lifecycle Phases
 
-Binino is designed to be highly modular, separating low-level hardware serial communication from high-level interface components. The project is implemented in React 18, utilizing functional components and custom React hooks for state management and protocol sequencing.
+Binino is structured into 5 cohesive engineering phases:
 
 ### Phase 1: Hardware Bridge and Live Terminal
-Phase 1 establishes the core browser-to-hardware serial interface, managing port lifecycle, data streaming, and live console visualization.
-- **Web Serial Interface**: Directly calls the browser's `navigator.serial` API to request and open serial interfaces.
-- **Asynchronous Read Loop**: Runs a non-blocking stream reader that processes incoming data chunks, uses a `TextDecoder` to format binary data into text lines, and appends them to the live terminal logs as serial data.
-- **HxD-Style Hex Viewer**: Accumulates raw bytes into a local buffer and renders them in a side-by-side hexadecimal octet and ASCII grid layout.
+Establishes the browser-to-hardware serial connection, managing port lifecycles and incoming streams.
+- **Web Serial Interface**: Directly calls the browser's `navigator.serial` API to request and lock serial interfaces without plugins.
+- **Asynchronous Read Loop**: Spawns a non-blocking stream reader decoding binary bytes into line-buffered logs with millisecond-precision timestamps (`HH:MM:SS.mmm`).
+- **Hex/ASCII Preview**: Displays a live-updating hexadecimal preview of raw incoming serial bytes.
 
 ### Phase 2: Flash Extractor
-Phase 2 implements a subset of the Espressif `esptool` UART bootloader protocol entirely client-side.
-- **SLIP Framing**: Encapsulates all bootloader command packets using Serial Line Internet Protocol (SLIP) boundaries (0xC0), escaping command payload occurrences of 0xC0 and 0xDB.
-- **Hardware Reset Sequence**: Cyclically toggles the Data Terminal Ready (DTR) and Request To Send (RTS) lines with precise 100ms timings to pull GPIO0 low and toggle the Enable (EN) pin, resetting the microcontroller into its internal ROM bootloader mode.
-- **SYNC Handshake**: Transmits command 0x08 with a specific 36-byte training pattern to synchronize baud rates and verify bootloader readiness, retrying up to 10 times with 500ms timeouts.
-- **Flash Memory Reading**: Transmits `READ_FLASH` commands (0x03) in sequential 1024-byte block requests, validating incoming packet structures and verifying the data integrity using an 8-bit XOR checksum (seed value 0xEF).
-- **Emulation Engine (Demo Mode)**: Simulates the entire bootloader connection, progress intervals, throughput speeds, warning retries, and file generation to facilitate visual testing in non-serial or virtual environments.
+Implements a browser-side subset of the Espressif `esptool` ROM bootloader protocol.
+- **SLIP Framing**: Packages and decodes bootloader packets using Serial Line Internet Protocol (SLIP) framing (0xC0).
+- **DTR/RTS Reset Sequence**: Cyclically toggles DTR and RTS lines with precise 100ms transitions to reset target ESP32/ESP8266 chips into flash download mode.
+- **SYNC Handshake**: Transmits training sequences to auto-detect baud rates and synchronize with ROM loaders.
+- **Flash Reader**: Issues sequential block read commands, validates checksums client-side, and yields a downloadable `.bin` firmware file generated entirely in browser memory.
+
+### Phase 3: Backend Handoff Server
+A lightweight, local Python service that interfaces the browser with native binary analysis tools.
+- **FastAPI Endpoint**: Receives target firmware binaries via secure multipart uploads and indexes jobs.
+- **Headless Ghidra Subprocess**: Programmatically runs Ghidra's headless decompiler (`analyzeHeadless`) to parse Xtensa/ARM/AVR machine instructions.
+- **Server-Sent Events (SSE)**: Streams Ghidra progress logs back to the browser, displaying stages (Import, Analysis, Decompilation, Export) in real time.
+
+### Phase 4: Code Explorer IDE
+An interactive, full-screen three-pane reverse-engineering interface that overlays on the dashboard.
+- **Pane A (Navigator)**: Sidebar containing virtualized scroll lists of decompiled functions, string tables, and imported/exported symbols.
+- **Pane B (Code Viewer)**: Displaying pseudo-C and raw disassembly side-by-side with custom inline syntax highlighting.
+- **Pane C (Hex Dump)**: Virtualized memory viewer mapping raw binary offsets to virtual addresses (e.g. `0x40080000` for ESP32) with a hover tooltip showing dec/bin/char values.
+
+### Phase 5: AI Explain & Production Polish
+The final delivery layer adding deep AI explanation and production-grade software engineering polish.
+- **AI Explain**: Streams real-time token-by-token explanations of decompiled code from the Anthropic Claude API using SSE. Explains high-level logic, peripheral register offsets, and potential vulnerabilities.
+- **Export Report**: Compiles the entire analysis result (decompile functions with CSS styling, symbols, strings) into a single, self-contained HTML file for off-line audits.
+- **Transitions & Boundaries**: Smooth CSS overlay entrance animations, class-based responsive viewports (<900px switches to tabs), and dual-layer React Error Boundaries isolating UI faults.
 
 ---
 
-## Technical Specifications
+## Installation & Quickstart
 
-### Custom Hooks
-
-#### useSerialPort
-Manages port connection, selection prompts, unexpected disconnect event handlers, and data chunk accumulations.
-- **Inputs**: Exposes configuration states for target architecture and baud rates.
-- **Outputs**: Returns state objects for connection status (`idle`, `connecting`, `connected`, `error`), live serial log entries, accumulated raw serial buffers, and control methods.
-- **Lock Management**: Offers `pauseReadLoop()` and `resumeReadLoop()` to temporarily suspend background terminal reading during high-priority binary transactions.
-
-#### useFlashExtractor
-Coordinates SLIP-framed bootloader transactions to dump SPI flash contents.
-- **Inputs**: Accesses target `portRef`, terminal log streams, and read loop controls from `useSerialPort`.
-- **Outputs**: Returns extraction status (`idle`, `syncing`, `reading`, `done`, `error`), transfer metrics (bytes read, percentage, transfer speed, and ETA), the generated binary array, and execution commands.
-- **Fault Tolerance**: If a checksum mismatch is detected, the hook logs a warning and retries the block read sequence up to 3 times before terminating the dump.
-
----
-
-## Getting Started
+To run a complete decompiler analysis pipeline, launch both the client-side development server and the local handoff backend.
 
 ### Prerequisites
-To communicate with physical microcontrollers, you must run the application in a browser that supports the Web Serial API:
-- Google Chrome (Desktop)
-- Microsoft Edge (Desktop)
-- Opera (Desktop)
 
-*Note: Safari, Firefox, and mobile browsers are not supported. If run on an unsupported browser, the application will display a warning banner indicating that hardware connection functions are disabled.*
+1. **Browser Support**: Web Serial API is supported in Google Chrome, Microsoft Edge, and Opera.
+2. **Java Runtime**: Ghidra requires OpenJDK 17 or OpenJDK 21 configured on your path.
+3. **Ghidra Installation**: Ensure `GHIDRA_HOME` is set pointing to your Ghidra directory.
 
-### Installation
+---
 
-1. **Install Node.js dependencies**:
+### Step 1: Backend Setup
+
+1. **Navigate to the server folder**:
+   ```bash
+   cd server
+   ```
+
+2. **Install Python dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Set your API keys (Optional)**:
+   To enable AI Explain with the live Claude API, set your Anthropic key:
+   - **Windows PowerShell**:
+     ```powershell
+     $env:ANTHROPIC_API_KEY="sk-ant-..."
+     ```
+   - **Linux / macOS Bash**:
+     ```bash
+     export ANTHROPIC_API_KEY="sk-ant-..."
+     ```
+   *If unset, the backend streams a high-fidelity typewriter simulation.*
+
+4. **Copy the Ghidra Script**:
+   Copy `server/ExportDecompiled.java` to your user scripts directory:
+   `$HOME/ghidra_scripts/`
+
+5. **Start the FastAPI Server**:
+   ```bash
+   python -m uvicorn main:app --port 8000
+   ```
+
+---
+
+### Step 2: Frontend Setup
+
+1. **Open a new terminal at the project root directory**:
    ```bash
    npm install
    ```
 
-2. **Start the local development server**:
+2. **Start the Vite Dev Server**:
    ```bash
    npm run dev
    ```
 
-3. **Build the production package**:
-   ```bash
-   npm run build
-   ```
+3. **Access Binino**:
+   Navigate to `http://localhost:5173`.
+
+---
+
+## Production Build & Bundle Size
+
+To build the static frontend bundle:
+```bash
+npm run build
+```
+This generates a production-optimized package inside `dist/`. The bundle size is thoroughly optimized to compile under **300KB gzipped** (typically ~77KB gzipped), ensuring instant loads.
 
 ---
 
 ## Emulation and Testing (Demo Mode)
 
-To inspect the visual interface and protocol logs without connecting physical hardware:
-1. Enable the **Demo Mode** switch in the top navigation bar.
-2. Click **Establish Bridge** in the hardware panel. A virtual serial connection will instantly connect to a simulated ESP32 chip.
-3. Click **Extract Firmware** to execute the simulated firmware backup sequence.
-4. Observe the terminal logs representing the bootloader reset, sync sequence, block reading, and a simulated checksum mismatch recovery.
-5. Toggle the segmented control at the top of the Hex viewer to **Flash Dump** to inspect the read bytes.
-6. Click **Download** to obtain the compiled `.bin` firmware file generated in memory.
-
----
-
-## Codebase Directory Structure
-
-```text
-binino/
-├── dist/                          # Production-ready compiled assets
-├── node_modules/                  # Project dependencies
-├── postcss.config.js              # PostCSS plugin configurations (ESM)
-├── tailwind.config.js             # Tailwind CSS theme extension configurations (ESM)
-├── tsconfig.json                  # TypeScript compiler rules
-├── vite.config.ts                 # Vite bundler alias definitions and dev settings
-├── index.html                     # Standard HTML template entry point
-├── package.json                   # Build dependencies and utility scripts
-├── README.md                      # Developer documentation
-└── src/
-    ├── main.tsx                   # React DOM mounting initialization
-    ├── App.tsx                    # Layout grid structures and global hooks integration
-    ├── index.css                  # Tailwinds css entries and custom scrollbar styles
-    ├── hooks/
-    │   ├── useSerialPort.ts       # Serial port interface hooks
-    │   └── useFlashExtractor.ts   # esptool bootloader and SLIP protocol hooks
-    └── components/
-        ├── Navbar.tsx             # Header navigation and emulation toggles
-        ├── ConnectionPanel.tsx    # Hardware interface drop-downs and connect buttons
-        ├── DeviceInfoCard.tsx     # Connected device metadata displays
-        ├── TerminalPane.tsx       # Live serial terminal output viewports
-        └── HexPreviewStrip.tsx    # Hexadecimal and ASCII dual-segment previewers
-```
-
----
-
-## Project Roadmap
-
-- **Phase 1**: Establishing hardware bridge and live serial terminal streams (Completed).
-- **Phase 2**: Assembling ROM bootloader flash extraction protocol and buffer downloader (Completed).
-- **Phase 3**: Integrating AVR/Arduino target programmers and AVRDUDE protocol adapters (Pending).
-- **Phase 4**: Constructing backend-free machine code decompilation pipeline (Pending).
-- **Phase 5**: Designing source code reverse engineering and pseudo-C visualization interface (Pending).
+Binino features a zero-dependency **Demo Mode** toggle:
+1. Turn **Demo Mode: ON** in the navigation bar.
+2. Click **Establish Bridge** to simulate a serial connection.
+3. Click **Extract Firmware** to observe simulated SLIP-framed reading.
+4. Once complete, click **Decompile Firmware** to upload the dummy binary.
+5. Open the **Code Explorer** overlay to inspect mock function lists, virtual hex viewers, and trigger simulated AI explanations.
+6. Click **Export Report** to test report generation outputs.

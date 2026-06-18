@@ -145,8 +145,8 @@ export const useBackendHandoff = ({
       // Avoid overwrite error state if closed successfully
       setUploadStatus((prev) => {
         if (prev === 'done' || prev === 'error') return prev;
-        appendLog('ERROR', 'SSE connection lost. Decompiler progress listener disconnected.');
-        setErrorMessage('Connection with progress stream was lost.');
+        appendLog('ERROR', 'Cannot connect to Binino server on localhost:8000. Run: python -m uvicorn server.main:app --port 8000');
+        setErrorMessage('Cannot connect to Binino server on localhost:8000.');
         return 'error';
       });
       es.close();

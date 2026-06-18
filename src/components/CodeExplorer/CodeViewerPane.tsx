@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { AnalysisResult, FunctionRecord } from '../../types/analysis';
 import { SyntaxHighlighter } from './SyntaxHighlighter';
+import { useAIExplain } from '../../hooks/useAIExplain';
 
 interface CodeViewerPaneProps {
   result: AnalysisResult;
@@ -10,6 +11,7 @@ interface CodeViewerPaneProps {
   wordWrap: boolean;
   setWordWrap: (wrap: boolean) => void;
   filename: string;
+  isDemoMode: boolean;
 }
 
 export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
@@ -20,7 +22,24 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
   wordWrap,
   setWordWrap,
   filename,
+  isDemoMode,
 }) => {
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+
+  const {
+    explainStatus,
+    streamedText,
+    tokensUsed,
+    errorMessage,
+    explain,
+    clearExplanation,
+  } = useAIExplain(isDemoMode);
+
+  // Automatically reset the explanation and close the panel when switching functions
+  useEffect(() => {
+    clearExplanation();
+    setIsPanelOpen(false);
+  }, [activeFunction, clearExplanation]);
   // Get active code block based on selected tab
   const code = useMemo(() => {
     if (!activeFunction) return '';
@@ -99,16 +118,19 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
           {activeFunction && activeTab === 'c' && (
             <button
               onClick={() => {
-                // PHASE 5: AI Explain button — send pseudo_c to Claude API here
-                alert('AI Explain: Phase 5 Integration placeholder.');
+                setIsPanelOpen(true);
+                explain(activeFunction.name, result.arch, result);
               }}
-              className="flex items-center gap-1 px-2.5 py-1 bg-[#172E3C] hover:bg-[#1E3B4D] text-[#63B3ED] text-[10px] font-bold rounded border border-[#2B4C62] transition-colors"
+              disabled={explainStatus === 'loading' || explainStatus === 'streaming'}
+              className="flex items-center gap-1.5 px-3 py-1 bg-[#00FFC8]/10 border border-[#00FFC8] text-[#00FFC8] text-[10px] font-bold rounded hover:bg-[#00FFC8]/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed duration-150 focus-visible:ring-1 focus-visible:ring-[#00FFC8] focus-visible:outline-none"
               title="Decompile and explain logic using Claude AI"
+              aria-label="Explain decompiled code with Claude AI"
             >
-              <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+              <svg className="w-3.5 h-3.5 fill-none stroke-current" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-4.88 2.5 2.5 0 0 1 0-3.12A2.5 2.5 0 0 1 9.5 2Z" />
+                <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 0-3.12 3 3 0 0 0 0-4.88 2.5 2.5 0 0 0 0-3.12A2.5 2.5 0 0 0 14.5 2Z" />
               </svg>
-              AI Explain
+              <span>Explain</span>
             </button>
           )}
 
@@ -119,6 +141,7 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
                 onClick={handleCopyAll}
                 className="p-1.5 text-[#718096] hover:text-[#00FFC8] rounded hover:bg-[#1E1E2E] transition-colors ti ti-copy"
                 title="Copy all code to clipboard"
+                aria-label="Copy code to clipboard"
               >
                 <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
                   <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />
@@ -130,6 +153,7 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
                 onClick={handleDownload}
                 className="p-1.5 text-[#718096] hover:text-[#00FFC8] rounded hover:bg-[#1E1E2E] transition-colors ti ti-download"
                 title={`Download as .${activeTab === 'c' ? 'c' : 'asm'}`}
+                aria-label="Download code to disk"
               >
                 <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
                   <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z" />
@@ -145,6 +169,7 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
                     : 'text-[#718096] hover:text-white hover:bg-[#1E1E2E]'
                 }`}
                 title="Toggle word wrap"
+                aria-label="Toggle code word wrap"
               >
                 <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
                   <path d="M4 19h16v-2H4v2zm16-6H4v2h16v-2zM4 9h16V7H4v2zm16-4H4v2h16V5z" />
@@ -181,6 +206,69 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
         ) : (
           <div className="w-full h-full flex items-center justify-center text-[#718096] text-xs select-none">
             <span>← Select a function from the navigator to view its decompiled code.</span>
+          </div>
+        )}
+      </div>
+
+      {/* AI Explain Sliding Drawer Panel */}
+      <div
+        className="border-t border-[#1E1E2E] bg-[#0A0A0F] transition-all duration-200 ease-out overflow-hidden flex flex-col flex-shrink-0"
+        style={{
+          maxHeight: isPanelOpen ? '260px' : '0px',
+        }}
+      >
+        {/* Panel Header */}
+        <div className="h-9 px-3 border-b border-[#1E1E2E] flex items-center justify-between select-none bg-[#0B0B11]">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              AI Analysis — {activeFunction?.name}
+            </span>
+            {(explainStatus === 'loading' || explainStatus === 'streaming') && (
+              <span className="w-3 h-3 border border-[#00FFC8] border-t-transparent rounded-full animate-spin"></span>
+            )}
+          </div>
+          <button
+            onClick={() => {
+              setIsPanelOpen(false);
+              clearExplanation();
+            }}
+            className="text-slate-500 hover:text-white text-xs p-1"
+            aria-label="Close AI Explanation Panel"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Panel Body */}
+        <div className="flex-1 p-3 overflow-y-auto font-sans text-[13px] leading-[1.7] text-slate-300">
+          {explainStatus === 'loading' && (
+            <div className="text-slate-500 text-xs italic flex items-center gap-2">
+              <span>Retrieving AST context and querying decompiler AI model...</span>
+            </div>
+          )}
+          
+          {(explainStatus === 'streaming' || explainStatus === 'done') && (
+            <p className="whitespace-pre-wrap select-text m-0">{streamedText}</p>
+          )}
+
+          {explainStatus === 'error' && (
+            <div className="bg-[#FF4C4C]/10 border border-[#FF4C4C]/30 rounded p-3 text-xs text-red-400 flex flex-col gap-2">
+              <div className="font-semibold">Explain Error: {errorMessage}</div>
+              <button
+                onClick={() => explain(activeFunction!.name, result.arch, result)}
+                className="w-fit px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white font-bold rounded transition-colors text-[10px]"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Panel Footer */}
+        {explainStatus === 'done' && (
+          <div className="h-6 px-3 border-t border-[#1E1E2E] flex items-center justify-between text-[9px] text-slate-500 bg-[#0B0B11]">
+            <span>Generated by Claude</span>
+            <span>{tokensUsed !== null ? `${tokensUsed} tokens` : ''} · Not a substitute for manual analysis</span>
           </div>
         )}
       </div>

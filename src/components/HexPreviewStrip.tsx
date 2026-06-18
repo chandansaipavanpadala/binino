@@ -89,16 +89,16 @@ export const HexPreviewStrip: React.FC<HexPreviewStripProps> = ({
           </span>
 
           {/* Segmented Control */}
-          <div className="flex items-center space-x-1 bg-[#1E1E2E]/60 p-0.5 rounded border border-[#1E1E2E] ml-0 sm:ml-2">
+          <div className="flex bg-[#12121A] p-0.5 rounded border border-[#1E1E2D] ml-0 sm:ml-2">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setPreviewMode('live');
               }}
-              className={`px-2 py-0.5 rounded text-[9px] font-sans font-semibold tracking-wider uppercase transition-all ${
+              className={`px-2 py-0.5 text-[9px] font-sans font-bold tracking-wider uppercase rounded transition-all ${
                 previewMode === 'live'
-                  ? 'bg-[#00FFC8] text-[#0A0A0F]'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[#1E1E2E] text-[#00FFC8]'
+                  : 'text-[#718096] hover:text-white'
               }`}
             >
               Live Stream
@@ -109,10 +109,10 @@ export const HexPreviewStrip: React.FC<HexPreviewStripProps> = ({
                 setPreviewMode('flash');
               }}
               disabled={extractionStatus !== 'done'}
-              className={`px-2 py-0.5 rounded text-[9px] font-sans font-semibold tracking-wider uppercase transition-all ${
+              className={`px-2 py-0.5 text-[9px] font-sans font-bold tracking-wider uppercase rounded transition-all ${
                 previewMode === 'flash'
-                  ? 'bg-[#00FFC8] text-[#0A0A0F]'
-                  : 'text-slate-500 disabled:opacity-30 disabled:cursor-not-allowed hover:text-slate-200'
+                  ? 'bg-[#1E1E2E] text-[#00FFC8]'
+                  : 'text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:text-white'
               }`}
               title={extractionStatus !== 'done' ? 'Dump firmware first to unlock' : 'View full dump'}
             >
@@ -127,9 +127,9 @@ export const HexPreviewStrip: React.FC<HexPreviewStripProps> = ({
             </span>
           )}
           {isExpanded ? (
-            <ChevronDown className="h-4 w-4 text-slate-400" />
-          ) : (
             <ChevronUp className="h-4 w-4 text-slate-400" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-slate-400" />
           )}
         </div>
       </button>
@@ -138,7 +138,22 @@ export const HexPreviewStrip: React.FC<HexPreviewStripProps> = ({
       {/* HEX Content Panel */}
       {isExpanded && (
         <div className="p-4 bg-[#0A0A0F] h-64 overflow-y-auto font-mono text-[11px] leading-5 select-text">
-          {buffer.length === 0 ? (
+          {extractionStatus === 'syncing' || extractionStatus === 'reading' ? (
+            <div className="space-y-2 py-2 animate-pulse select-none">
+              <div className="text-slate-600 select-none pb-1 border-b border-[#1E1E2E] mb-2 flex">
+                <span className="inline-block w-24">OFFSET</span>
+                <span className="inline-block flex-1">00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F</span>
+                <span className="inline-block w-32 pl-4">ASCII PREVIEW</span>
+              </div>
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <div key={idx} className="flex items-center gap-4">
+                  <div className="h-3 w-16 bg-[#1E1E2D] rounded"></div>
+                  <div className="h-3 flex-1 bg-[#1E1E2D] rounded"></div>
+                  <div className="h-3 w-28 bg-[#1E1E2D] rounded"></div>
+                </div>
+              ))}
+            </div>
+          ) : buffer.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-1 font-sans">
               <span>HEX Buffer is empty.</span>
               <span className="text-[10px] font-mono text-slate-600">Waiting for binary stream...</span>
