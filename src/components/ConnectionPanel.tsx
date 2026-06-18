@@ -162,7 +162,6 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
               >
                 <option value="esp32">ESP32 (WROOM / WROVER)</option>
                 <option value="esp8266">ESP8266 (EX / NodeMCU)</option>
-                <option value="rp2040">Raspberry Pi Pico (RP2040 ARM Cortex-M0+)</option>
                 <option value="avr">AVR / Arduino (ATmega328P)</option>
                 <option value="cortex">ARM Cortex-M (STM32 / NXP)</option>
                 <option value="riscv">RISC-V (CH32 / ESP32-C3)</option>

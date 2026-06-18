@@ -6,7 +6,7 @@ BININO is a universal, web-based toolkit designed for firmware extraction, stati
 
 ## Key Features and Capabilities
 
-* **Web-Based Hardware Bridge**: Connect directly to microcontrollers (ESP32, ESP8266, Raspberry Pi Pico RP2040, ARM Cortex-M, AVR, RISC-V) via USB from the browser, eliminating the need for local drivers or native client installations.
+* **Web-Based Hardware Bridge**: Connect directly to microcontrollers (ESP32, ESP8266, ARM Cortex-M, AVR, RISC-V) via USB from the browser, eliminating the need for local drivers or native client installations.
 * **ROM Bootloader Extractor**: Employs esptool-style SLIP bootloader handshakes to cycle DTR/RTS lines, force target devices into download mode, and extract raw flash memory blocks with active XOR checksum verification.
 * **Unified Accordion Sidebar**: Provides a smooth transition through the connection, extraction, metadata, and handoff stages with a mutually exclusive collapsible sidebar stack.
 * **Automated Ghidra Pipeline**: Executes headless Ghidra analysis on a local FastAPI server. Disassembles and decompiles imported binary blobs, mapping raw instructions back into clean pseudo-C, symbols, and string tables.
@@ -78,7 +78,7 @@ Phase 3 implements the local Python backend that parses raw binary blobs using s
 Phase 4 creates a multi-pane development environment to browse decompiled binary findings:
 * **Navigator Pane**: Displays list search tabs for functions, strings, and symbols. The entry point is pinned at the top with a flag icon.
 * **Decompiled Code Viewer**: Displays pseudo-C code and assembly blocks side-by-side. Uses custom regex tokenizers to style keywords, types, labels, comments, and strings. Offers word-wrap switches and click-to-copy line number paths (`filename:line`).
-* **Hex Virtualizer**: Renders the complete binary dump virtualized to target architecture addresses (e.g. `0x10000000` for RP2040, `0x40080000` for ESP32). Features address search inputs, active function bounds highlighting, and interactive byte tooltips displaying decimal, binary, and ASCII representations.
+* **Hex Virtualizer**: Renders the complete binary dump virtualized to target architecture addresses (e.g. `0x40080000` for ESP32). Features address search inputs, active function bounds highlighting, and interactive byte tooltips displaying decimal, binary, and ASCII representations.
 * **Splitters and Persistence**: Features resizable split-pane widths that persist in the browser's `localStorage` alongside word-wrap preferences.
 
 ### Phase 5: Claude AI Explain and Production Polish
@@ -109,15 +109,15 @@ The FastAPI backend exposes the following endpoints:
 * **Content-Type**: `multipart/form-data`
 * **Request**:
   - `file`: Raw firmware binary (`.bin`).
-  - `arch`: Target architecture (`esp32`, `esp8266`, `rp2040`, `avr`, `cortex`, `riscv`).
+  - `arch`: Target architecture (`esp32`, `esp8266`, `avr`, `cortex`, `riscv`).
   - `flash_size`: Expected file size in bytes.
 * **Response (JSON)**:
   ```json
   {
     "job_id": "job_a1b2c3d4",
-    "filename": "firmware_rp2040.bin",
+    "filename": "firmware_esp32.bin",
     "size_bytes": 4194304,
-    "arch": "rp2040",
+    "arch": "esp32",
     "status": "queued",
     "created_at": "2026-06-18T09:30:00Z"
   }

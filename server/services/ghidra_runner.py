@@ -17,8 +17,7 @@ ARCH_MAP = {
     "avr": "AVR8:LE:16:default",
     "arm": "ARM:LE:32:v7",
     "cortex": "ARM:LE:32:v7",
-    "riscv": "RISCV:LE:32:RV32G",
-    "rp2040": "ARM:LE:32:v6"
+    "riscv": "RISCV:LE:32:RV32G"
 }
 
 class GhidraRunner:
@@ -87,8 +86,7 @@ class GhidraRunner:
                 "avr": "0x00000000",
                 "arm": "0x08000000",
                 "cortex": "0x08000000",
-                "riscv": "0x00010000",
-                "rp2040": "0x10000000"
+                "riscv": "0x00010000"
             }.get(arch, "0x00000000")
 
             mock_asm = {
@@ -96,11 +94,10 @@ class GhidraRunner:
                 "esp8266": "entry app_main:\n  movi a2, 0x3FFFC000\n  l32i a3, a2, 0\n  ret.n",
                 "avr": "00000000 <main>:\n  ldi r16, 0xFF\n  out 0x0A, r16\n  out 0x0B, r16\n  rjmp .-2",
                 "cortex": "08000000 <main>:\n  push {r7, lr}\n  add r7, sp, #0\n  bl system_init\n  movs r0, #0\n  pop {r7, pc}",
-                "riscv": "00010000 <main>:\n  addi sp, sp, -16\n  sw ra, 12(sp)\n  jal ra, system_init\n  li a0, 0\n  lw ra, 12(sp)\n  jalr zero, 0(ra)",
-                "rp2040": "10000000 <main>:\n  push {r7, lr}\n  add r7, sp, #0\n  bl system_init\n  movs r0, #0\n  pop {r7, pc}"
+                "riscv": "00010000 <main>:\n  addi sp, sp, -16\n  sw ra, 12(sp)\n  jal ra, system_init\n  li a0, 0\n  lw ra, 12(sp)\n  jalr zero, 0(ra)"
             }.get(arch, "nop")
 
-            base_addr = 0x40080000 if arch == "esp32" else (0x10000000 if arch == "rp2040" else 0x08000000)
+            base_addr = 0x40080000 if arch == "esp32" else 0x08000000
             def hex_addr(offset):
                 return f"0x{(base_addr + offset):08x}"
 

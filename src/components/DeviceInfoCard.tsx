@@ -29,7 +29,6 @@ export const DeviceInfoCard: React.FC<DeviceInfoCardProps> = ({
     const archMap: Record<string, string> = {
       esp32: 'ESP32 (Tensilica)',
       esp8266: 'ESP8266 (L106)',
-      rp2040: 'RP2040 (Cortex-M0+)',
       avr: 'AVR / ATmega',
       cortex: 'ARM Cortex-M',
       riscv: 'RISC-V 32-bit',

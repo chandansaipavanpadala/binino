@@ -357,58 +357,6 @@ export const useFlashExtractor = ({
     setProgressPercent(0);
     setFlashBuffer(null);
 
-    // --- RP2040 SERIAL FLASH BRIDGE HANDLER ---
-    if (arch === 'rp2040') {
-      setExtractionStatus('syncing');
-      appendLog('INFO', 'RP2040 ROM Bootloader utilizes USB Mass Storage (UF2) / USB picotool. Native UART bootrom is unsupported.');
-      appendLog('INFO', 'Establishing custom Pico CDC UART flash bridge handshake...');
-      await new Promise((r) => setTimeout(r, 800));
-
-      appendLog('INFO', 'Pico bridge synced. Initializing flash dump...');
-      setExtractionStatus('reading');
-
-      const tempBuffer = new Uint8Array(targetSize);
-      let readCount = 0;
-
-      for (let offset = 0; offset < targetSize; offset += 1024) {
-        if (abortRef.current) {
-          appendLog('WARN', 'Extraction cancelled by user.');
-          setExtractionStatus('idle');
-          return;
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, 8));
-
-        for (let j = 0; j < 1024; j++) {
-          tempBuffer[offset + j] = (offset + j) % 256;
-        }
-
-        readCount += 1024;
-        setBytesRead(readCount);
-        const percent = Math.round((readCount / targetSize) * 100);
-        setProgressPercent(percent);
-
-        if (offset === 0x001400) {
-          appendLog('DATA', 'Block 0x001400 received — 1024 bytes (checksum OK)');
-        } else if (offset === 0x002800) {
-          appendLog('WARN', 'Checksum mismatch at block 0x002800 — retrying (1/3)...');
-          await new Promise((r) => setTimeout(r, 400));
-          appendLog('DATA', 'Block 0x002800 received — 1024 bytes (checksum OK)');
-        } else if (offset % (1024 * 64) === 0) {
-          const hexOffset = `0x${offset.toString(16).toUpperCase().padStart(6, '0')}`;
-          appendLog('DATA', `Block ${hexOffset} received — 1024 bytes (checksum OK)`);
-        }
-      }
-
-      setFlashBuffer(tempBuffer);
-      setExtractionStatus('done');
-      appendLog('INFO', `Extraction complete. ${targetSize} bytes read. Binary ready for download.`);
-      
-      if (onExtractionDone) {
-        onExtractionDone(tempBuffer);
-      }
-      return;
-    }
 
     // --- MOCK SIMULATION MODE ---
     if (isDemoMode) {

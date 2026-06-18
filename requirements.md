@@ -57,5 +57,4 @@ Binino communicates with target microcontrollers directly through the browser.
 * **Supported Architectures**:
   - **ESP32**: Xtensa 32-bit (UART Bootloader SLIP synchronization)
   - **ESP8266**: Xtensa 32-bit (UART Bootloader SLIP synchronization)
-  - **Raspberry Pi Pico (RP2040)**: ARM Cortex-M0+ (UART CDC serial bridge bypass emulator)
   - **Generic ARM Cortex / RISC-V**: Simulation or handoff backend analysis support.

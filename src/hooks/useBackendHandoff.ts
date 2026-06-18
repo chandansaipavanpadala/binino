@@ -218,7 +218,7 @@ export const useBackendHandoff = ({
         setAnalysisStage('Decompilation complete.');
         
         // Mock payload results matching schemas
-        const baseAddr = selectedArch === 'esp32' ? 0x40080000 : selectedArch === 'rp2040' ? 0x10000000 : 0x08000000;
+        const baseAddr = selectedArch === 'esp32' ? 0x40080000 : 0x08000000;
         const hexAddr = (offset: number) => `0x${(baseAddr + offset).toString(16).padStart(8, '0')}`;
 
         setResult({

@@ -9,7 +9,6 @@ export const StatusBar: React.FC = () => {
   const archLabel: Record<string, string> = {
     esp32: 'ESP32',
     esp8266: 'ESP8266',
-    rp2040: 'RP2040 (Pico)',
     avr: 'AVR',
     cortex: 'Cortex-M',
     riscv: 'RISC-V',

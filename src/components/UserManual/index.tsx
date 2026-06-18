@@ -31,7 +31,7 @@ Backend (Local Server):
 
 Hardware:
 • USB cable (Type-A to Micro-USB or USB-C depending on your dev board)
-• Supported microcontroller: ESP32, ESP8266, Raspberry Pi Pico (RP2040), ARM Cortex-M, AVR, or RISC-V`,
+• Supported microcontroller: ESP32, ESP8266, ARM Cortex-M, AVR, or RISC-V`,
   },
   {
     id: 'installation',
@@ -61,7 +61,7 @@ Hardware:
     id: 'connecting',
     title: 'Connecting a Device',
     content: `1. Open BININO in Chrome/Edge and navigate to the Dashboard.
-2. Select your microcontroller architecture from the dropdown (ESP32, ESP8266, Raspberry Pi Pico (RP2040), ARM Cortex-M, AVR, or RISC-V).
+2. Select your microcontroller architecture from the dropdown (ESP32, ESP8266, ARM Cortex-M, AVR, or RISC-V).
 3. Select the baud rate (115200 is the default for most ESP devices).
 4. Click "Establish Bridge" — a browser dialog will prompt you to select a COM/serial port.
 5. Grant permission to the selected port.
@@ -231,16 +231,74 @@ export const UserManual: React.FC = () => {
   const [activeSection, setActiveSection] = useState('overview');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+  const isClickScrolling = useRef<boolean>(false);
+  const scrollTimeout = useRef<number | null>(null);
 
-  useEffect(() => {
-    const el = document.getElementById(`section-${activeSection}`);
-    if (el && contentRef.current) {
-      contentRef.current.scrollTo({ top: el.offsetTop - 80, behavior: 'smooth' });
+  const handleSectionClick = (sectionId: string) => {
+    setActiveSection(sectionId);
+    setIsMobileNavOpen(false);
+    
+    // Temporarily disable scroll-spy updates during smooth scroll transition
+    isClickScrolling.current = true;
+    if (scrollTimeout.current) {
+      window.clearTimeout(scrollTimeout.current);
     }
-  }, [activeSection]);
+
+    const el = document.getElementById(`section-${sectionId}`);
+    if (el && contentRef.current) {
+      const containerTop = contentRef.current.getBoundingClientRect().top;
+      const elementTop = el.getBoundingClientRect().top;
+      const scrollTarget = contentRef.current.scrollTop + (elementTop - containerTop) - 24;
+      
+      contentRef.current.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+    }
+
+    // Re-enable scroll spy after the smooth scroll is expected to complete
+    scrollTimeout.current = window.setTimeout(() => {
+      isClickScrolling.current = false;
+    }, 800);
+  };
+
+  // Clean up timeouts
+  useEffect(() => {
+    return () => {
+      if (scrollTimeout.current) {
+        window.clearTimeout(scrollTimeout.current);
+      }
+    };
+  }, []);
+
+  // Scroll spy observer to highlight sections automatically while scrolling
+  useEffect(() => {
+    const observerOptions = {
+      root: contentRef.current,
+      rootMargin: '-40px 0px -70% 0px',
+      threshold: 0,
+    };
+
+    const observerCallback = (entries: IntersectionObserverEntry[]) => {
+      if (isClickScrolling.current) return;
+      
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const sectionId = entry.target.id.replace('section-', '');
+          setActiveSection(sectionId);
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(observerCallback, observerOptions);
+    const sectionElements = document.querySelectorAll('[id^="section-"]');
+    sectionElements.forEach((el) => observer.observe(el));
+
+    return () => {
+      sectionElements.forEach((el) => observer.unobserve(el));
+      observer.disconnect();
+    };
+  }, []);
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
+    <div className="h-screen flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
       {/* Header */}
       <div className="w-full px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
         <div className="flex items-center space-x-4">
@@ -267,11 +325,11 @@ export const UserManual: React.FC = () => {
         </button>
       </div>
 
-      <div className="flex-1 flex relative">
+      <div className="flex-1 flex relative overflow-hidden">
         {/* Left nav — sticky on desktop, dropdown on mobile */}
         <nav
           className={`
-            lg:sticky lg:top-0 lg:h-screen lg:w-56 lg:shrink-0 lg:block
+            lg:h-full lg:w-56 lg:shrink-0 lg:block
             ${isMobileNavOpen ? 'absolute z-50 inset-x-0 top-0 block' : 'hidden lg:block'}
           `}
           style={{
@@ -279,14 +337,11 @@ export const UserManual: React.FC = () => {
             borderRight: '1px solid var(--border-subtle)',
           }}
         >
-          <div className="p-4 space-y-0.5 overflow-y-auto max-h-screen">
+          <div className="p-4 space-y-0.5 overflow-y-auto h-full">
             {sections.map((s) => (
               <button
                 key={s.id}
-                onClick={() => {
-                  setActiveSection(s.id);
-                  setIsMobileNavOpen(false);
-                }}
+                onClick={() => handleSectionClick(s.id)}
                 className="w-full text-left px-3 py-2 rounded text-xs font-medium transition-all duration-150"
                 style={{
                   backgroundColor: activeSection === s.id ? 'var(--bg-elevated)' : 'transparent',

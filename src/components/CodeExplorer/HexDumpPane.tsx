@@ -47,7 +47,6 @@ export const HexDumpPane: React.FC<HexDumpPaneProps> = ({
     const arch = result.arch?.toLowerCase() || '';
     if (arch === 'esp32') return 0x40080000;
     if (arch === 'esp8266') return 0x40000000;
-    if (arch === 'rp2040') return 0x10000000;
     if (arch === 'avr') return 0x00000000;
     if (arch === 'arm' || arch === 'cortex') return 0x08000000;
     if (arch === 'riscv') return 0x00010000;
