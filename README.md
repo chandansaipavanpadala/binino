@@ -1,12 +1,24 @@
-# Binino — Web-Based Firmware Extraction and Reverse Engineering Bridge
+# BININO - Web-Based Firmware Extraction and Reverse Engineering Toolkit
 
-Binino is a universal, web-based toolkit designed for firmware extraction, static binary analysis, and reverse engineering. Operating directly inside modern web browsers via the Web Serial API, Binino establishes a high-performance serial bridge to microcontrollers, automates firmware extraction, runs headless Ghidra analysis on a local backend, and leverages Claude AI to explain decompiled functions in plain English.
+BININO is a universal, web-based toolkit designed for firmware extraction, static binary analysis, and reverse engineering. Operating directly inside modern web browsers via the Web Serial API, BININO establishes a high-performance serial bridge to microcontrollers, automates firmware extraction, runs headless Ghidra analysis on a local backend, and leverages Claude AI to explain decompiled functions in plain English.
+
+---
+
+## Key Features and Capabilities
+
+* **Web-Based Hardware Bridge**: Connect directly to microcontrollers (ESP32, ESP8266, Raspberry Pi Pico RP2040, ARM Cortex-M, AVR, RISC-V) via USB from the browser, eliminating the need for local drivers or native client installations.
+* **ROM Bootloader Extractor**: Employs esptool-style SLIP bootloader handshakes to cycle DTR/RTS lines, force target devices into download mode, and extract raw flash memory blocks with active XOR checksum verification.
+* **Unified Accordion Sidebar**: Provides a smooth transition through the connection, extraction, metadata, and handoff stages with a mutually exclusive collapsible sidebar stack.
+* **Automated Ghidra Pipeline**: Executes headless Ghidra analysis on a local FastAPI server. Disassembles and decompiles imported binary blobs, mapping raw instructions back into clean pseudo-C, symbols, and string tables.
+* **IDE-Style Code Explorer**: Features a three-pane layout including a function/symbol list searcher, a syntax-highlighted decompiler view (C and Assembly), and a virtualized memory Hex Dump synced to the active function's bounds.
+* **Claude AI Assistant**: Streams step-by-step plain-English explanations of target functions directly in the IDE to assist in security reviews and hardware audits.
+* **Portable HTML Reports**: Exports fully self-contained offline reports containing all decompiled C code, assembly listings, symbols, and strings.
 
 ---
 
 ## System Architecture
 
-Binino utilizes a distributed architecture that keeps hardware communication and user interaction entirely client-side, offloading heavy binary analysis tasks to a local backend:
+BININO utilizes a distributed architecture that keeps hardware communication and user interaction entirely client-side, offloading heavy binary analysis tasks to a local backend:
 
 ```text
 +--------------------------------------------------------------------------------+
@@ -38,9 +50,9 @@ Binino utilizes a distributed architecture that keeps hardware communication and
 
 ## Core Engineering Phases
 
-The project was built and delivered across 5 modular phases:
+The project is structured across 6 modular engineering phases:
 
-### Phase 1: Hardware Bridge & Live Console
+### Phase 1: Hardware Bridge and Live Console
 Phase 1 implements the raw serial interface and logging views:
 * **Web Serial Interface**: Directly calls the browser's `navigator.serial` API to request and lock serial ports.
 * **Non-Blocking Read Loop**: Spawns an asynchronous read loop processing incoming streams via `TextDecoder` to assemble line-buffered outputs.
@@ -54,28 +66,37 @@ Phase 2 implements the Espressif bootloader interface to extract raw SPI flash m
 * **SYNC Handshake**: Transmits command `0x08` along with a 36-byte training pattern, validating incoming responses and retrying up to 10 times with 500ms timeouts on failures.
 * **Flash Memory Reading**: Sends `READ_FLASH` command (`0x03`) in sequential 1024-byte block increments. Validates incoming payload layouts and calculates an 8-bit XOR checksum (seed value `0xEF`) to check data integrity. Retries block read operations up to 3 times on checksum errors before terminating the sequence.
 
-### Phase 3: Backend Handoff Server
+### Phase 3: Backend Handoff Server and Ghidra 12 Compatibility
 Phase 3 implements the local Python backend that parses raw binary blobs using static reverse-engineering tools:
 * **FastAPI Server**: Lightweight API running on `localhost:8000` with CORS mappings for frontend client environments.
-* **Job Queue Manager**: Allocates a unique workspace directory for each decompilation job. Runs a background garbage-collection loop that purges job outputs older than 1 hour to prevent disk depletion.
-* **Ghidra Headless Integration**: Spawns `$GHIDRA_HOME/support/analyzeHeadless` in a non-blocking subprocess. Registers a post-analysis Java script (`ExportDecompiled.java`) to iterate through functions, extracting assembly sequences and pseudo-C code blocks.
+* **Job Queue Manager**: Allocates a workspace directory for each decompilation job. Runs a background garbage-collection loop that purges job outputs older than 1 hour to prevent disk depletion.
+* **Ghidra Headless Integration**: Spawns `$GHIDRA_HOME/support/analyzeHeadless.bat` in a non-blocking subprocess. Registers a post-analysis Java script (`ExportDecompiled.java`) to iterate through functions, extracting assembly sequences and pseudo-C code blocks.
+* **API Classpath Fixes**: Rewrote the headless decompiler script (`ExportDecompiled.java`) string extractor to use `DefinedDataIterator.byDataInstance` combined with a `StringDataInstance` filter. This ensures compatibility with Ghidra 12.1.2 where the static `definedStrings(Program)` method is absent.
 * **Server-Sent Events (SSE)**: Streams real-time subprocess stdout logs back to the browser. The frontend decodes these events to update progress steps (Import, Auto Analysis, Decompilation, Export) and percent metrics.
 
 ### Phase 4: Interactive Code Explorer
 Phase 4 creates a multi-pane development environment to browse decompiled binary findings:
 * **Navigator Pane**: Displays list search tabs for functions, strings, and symbols. The entry point is pinned at the top with a flag icon.
 * **Decompiled Code Viewer**: Displays pseudo-C code and assembly blocks side-by-side. Uses custom regex tokenizers to style keywords, types, labels, comments, and strings. Offers word-wrap switches and click-to-copy line number paths (`filename:line`).
-* **Hex Virtualizer**: Renders the complete binary dump virtualized to target architecture addresses (e.g. `0x40080000` for ESP32). Features address search inputs, active function bounds highlighting, and interactive byte tooltips displaying decimal, binary, and ASCII representations.
-* **Splitters & Persistence**: Features resizable split-pane widths that persist in the browser's `localStorage` alongside word-wrap preferences.
+* **Hex Virtualizer**: Renders the complete binary dump virtualized to target architecture addresses (e.g. `0x10000000` for RP2040, `0x40080000` for ESP32). Features address search inputs, active function bounds highlighting, and interactive byte tooltips displaying decimal, binary, and ASCII representations.
+* **Splitters and Persistence**: Features resizable split-pane widths that persist in the browser's `localStorage` alongside word-wrap preferences.
 
-### Phase 5: Claude AI Explain & Production Polish
+### Phase 5: Claude AI Explain and Production Polish
 Phase 5 implements AI-assisted code walkthroughs and production-grade audits:
 * **AI Explain API**: Integrates the Anthropic Python client in the backend. Streams token-by-token function explanations using Claude model `claude-3-5-sonnet-20241022` to describe function goals, hardware register reads, loops, and security audit flags.
 * **Typewriter Hook**: Uses `fetch` and `ReadableStream` to stream text blocks in real time.
 * **Offline HTML Report**: Generates a self-contained report containing all functions, pseudo-C blocks with syntax highlighting CSS, and symbols for offline review.
 * **Fault Tolerant Boundaries**: Wraps the Code Explorer overlay in React `ErrorBoundary` handlers that display crash diagnostics and log issues to the terminal.
-* **A11y & Focus Traps**: Traps keyboard focus inside the modal overlays, adds appropriate `aria-label` tags, and flags `role="tab"` and `role="tablist"` attributes.
+* **Accessibility and Focus**: Traps keyboard focus inside the modal overlays, adds appropriate `aria-label` tags, and flags `role="tab"` and `role="tablist"` attributes.
 * **Responsive Layouts**: Collapses panels on viewports less than 900px wide into a single-pane tabbed selector.
+
+### Phase 6: Animated Transitions, Layout Height, and Safety Locks
+Phase 6 adds layout responsiveness and operation protections:
+* **Accordion Sidebar Stack**: Left-hand control cards use a shared state in `Dashboard.tsx` to expand one panel while automatically collapsing others. It auto-focuses the next stage (e.g., expanding the decompiler handoff once extraction is complete).
+* **Smooth CSS Transitions**: Replaced snap unmounting with CSS transitions on `max-height`, `opacity`, and `pointer-events` to yield smooth collapsible animations.
+* **Scroll-Safe Layout Constraints**: Removed fixed wrapper heights around the Hex Buffer Preview to let the Terminal logs pane scale dynamically. This prevents layout overflow clipping and locks scroll coordinates.
+* **Active Extraction Lock**: Toggling expansion of the Hex Buffer Preview is locked and disabled with visual indicators (lock icon, opacity fade, tooltip warnings) during active extraction runs, preventing serial log scrolling disruptions.
+* **Landing Page Visibility**: Optimized paddings and margins on the home landing page to draw the wordmark and cards upwards, keeping the footer visible in standard viewports without requiring vertical scrollbar adjustments.
 
 ---
 
@@ -88,15 +109,15 @@ The FastAPI backend exposes the following endpoints:
 * **Content-Type**: `multipart/form-data`
 * **Request**:
   - `file`: Raw firmware binary (`.bin`).
-  - `arch`: Target architecture (`esp32`, `esp8266`, `avr`, `cortex`, `riscv`).
+  - `arch`: Target architecture (`esp32`, `esp8266`, `rp2040`, `avr`, `cortex`, `riscv`).
   - `flash_size`: Expected file size in bytes.
 * **Response (JSON)**:
   ```json
   {
     "job_id": "job_a1b2c3d4",
-    "filename": "firmware_esp32.bin",
-    "size_bytes": 1048576,
-    "arch": "esp32",
+    "filename": "firmware_rp2040.bin",
+    "size_bytes": 4194304,
+    "arch": "rp2040",
     "status": "queued",
     "created_at": "2026-06-18T09:30:00Z"
   }
@@ -109,17 +130,14 @@ The FastAPI backend exposes the following endpoints:
   - `event: status`: Emits JSON status chunks:
     ```json
     {
-      "stage": "decompiling",
-      "message": "Reconstructing function app_main",
+      "stage": "Decompiling",
+      "message": "Running decompilation analyzer and recovering AST constructs...",
       "percent": 70
     }
     ```
   - `event: result`: Emits the parsed `AnalysisResult` JSON payload upon completion.
   - `event: done`: Signals stream termination.
-  - `event: error`: Emits failure messages:
-    ```json
-    { "message": "Ghidra analysis failed: script compile error" }
-    ```
+  - `event: error`: Emits failure messages.
 
 ### 3. Stream Claude AI Explanations
 * **Route**: `POST /api/explain`
@@ -140,15 +158,15 @@ The FastAPI backend exposes the following endpoints:
 
 ---
 
-## Installation & Setup
+## Installation and Setup
 
-### Prerequisites & Requirements
+### Prerequisites and Requirements
 
-For a complete breakdown of version requirements, library versions, frameworks, and microcontroller support, refer to the [Requirements, Versions, and Frameworks Guide](file:///p:/OneDrive - Amrita vishwa vidyapeetham/ASEB/Projects/binino/requirements.md).
+For a complete breakdown of version requirements, library versions, frameworks, and microcontroller support, refer to the [Requirements, Versions, and Frameworks Guide](requirements.md).
 
 To compile and execute the complete pipeline, your system must have:
 1. **Java Development Kit (JDK)**: OpenJDK 17 or OpenJDK 21 installed.
-2. **Ghidra**: Download and extract Ghidra 11.0+ from [ghidra-sre.org](https://ghidra-sre.org/).
+2. **Ghidra**: Download and extract Ghidra 11.0+ or 12.0+ (from the official Ghidra website).
 3. **Environment Variable**: Set `GHIDRA_HOME` pointing to your Ghidra installation path.
 
 ---
@@ -166,11 +184,11 @@ To compile and execute the complete pipeline, your system must have:
    ```
 
 3. Configure your API key (Optional - required for real Claude AI calls):
-   - **Windows PowerShell**:
+   * **Windows PowerShell**:
      ```powershell
      $env:ANTHROPIC_API_KEY="your-api-key"
      ```
-   - **Linux / macOS Bash**:
+   * **Linux / macOS Bash**:
      ```bash
      export ANTHROPIC_API_KEY="your-api-key"
      ```
@@ -200,7 +218,7 @@ To compile and execute the complete pipeline, your system must have:
    npm run dev
    ```
 
-4. Open `http://localhost:5173` in a supported browser (Google Chrome, Microsoft Edge, or Opera).
+4. Open `http://localhost:3000` in a supported browser (Google Chrome, Microsoft Edge, or Opera).
 
 ---
 
@@ -229,17 +247,17 @@ binino/
 │   │   └── schemas.py             # Pydantic validation schemas
 │   ├── routes/
 │   │   ├── upload.py              # Multipart firmware uploads route
-│   │   ├── analyze.py             # Ghidra analysis & SSE progress route
+│   │   ├── analyze.py             # Ghidra analysis and SSE progress route
 │   │   └── explain.py             # Anthropic Claude API explain route
 │   ├── services/
-│   │   ├── job_manager.py         # Job tracking & folder cleanup service
-│   │   └── ghidra_runner.py       # Subprocess invocation & log parser
+│   │   ├── job_manager.py         # Job tracking and folder cleanup service
+│   │   └── ghidra_runner.py       # Subprocess invocation and log parser
 │   ├── ExportDecompiled.java      # Headless Ghidra decompiler exporter script
 │   ├── main.py                    # FastAPI application initialization
 │   ├── requirements.txt           # Python backend dependencies
 │   └── README_server.md           # Backend installation guide
 ├── src/                           # Frontend React application
-│   ├── assets/                    # Image files & graphic layouts
+│   ├── assets/                    # Image files and graphic layouts
 │   ├── types/
 │   │   └── analysis.ts            # Analysis result types definitions
 │   ├── utils/
@@ -247,25 +265,76 @@ binino/
 │   ├── hooks/
 │   │   ├── useSerialPort.ts       # Web Serial bridge state hook
 │   │   ├── useFlashExtractor.ts   # esptool ROM extraction protocol hook
-│   │   ├── useBackendHandoff.ts   # API handoff & SSE progress hook
+│   │   ├── useBackendHandoff.ts   # API handoff and SSE progress hook
+│   │   ├── useCodeExplorer.ts     # Code Explorer coordination hook
 │   │   └── useAIExplain.ts        # Claude AI streaming hook
+│   ├── context/
+│   │   └── AppContext.tsx         # Shared frontend application context provider
 │   ├── components/
-│   │   ├── Navbar.tsx             # Navigation bar & Demo mode controls
-│   │   ├── ConnectionPanel.tsx    # Port select & baud configuration dropdowns
+│   │   ├── Navbar.tsx             # Navigation bar and Demo mode controls
+│   │   ├── ConnectionPanel.tsx    # Port select and baud configuration dropdowns
 │   │   ├── DeviceInfoCard.tsx     # USB device metadata displays
+│   │   ├── ExtractionPanel.tsx    # Flash memory block reading pane
+│   │   ├── HandoffPanel.tsx       # Local server connection and SSE stepper
+│   │   ├── WorkflowStepper.tsx    # Stage progress indicator header
 │   │   ├── TerminalPane.tsx       # Live terminal logging panel
 │   │   ├── HexPreviewStrip.tsx    # Collapsible hex grid previewer
+│   │   ├── Dashboard.tsx          # Master sidebar control and layout structure
+│   │   ├── Footer.tsx             # Unified system status footer
+│   │   ├── StatusBar.tsx          # System status bar details
+│   │   ├── FAQ/                   # Frequently Asked Questions component
+│   │   │   └── index.tsx          # FAQ items and list wrapper
+│   │   ├── UserManual/            # Interactive user operations manual
+│   │   │   └── index.tsx          # Detailed hardware and setup instructions
 │   │   └── CodeExplorer/          # Three-pane Code Explorer IDE
 │   │       ├── ErrorBoundary.tsx  # React Error Boundary crash layouts
 │   │       ├── GlobalSearch.tsx   # Ctrl+K fuzzy symbol locator
 │   │       ├── NavigatorPane.tsx  # Functions/Strings/Symbols sidebar list
-│   │       ├── CodeViewerPane.tsx # Decompiled source viewer & AI drawer
+│   │       ├── CodeViewerPane.tsx # Decompiled source viewer and AI drawer
 │   │       ├── HexDumpPane.tsx    # Virtualized memory hex dump column
 │   │       ├── SyntaxHighlighter.tsx # Pseudo-C/Asm regex highlighting
-│   │       └── index.tsx          # Main explorer overlay shell & keybinds
-│   ├── index.css                  # Tailwinds CSS directives
+│   │       └── index.tsx          # Main explorer overlay shell and keybinds
+│   ├── index.css                  # Core CSS and design style definitions
 │   └── main.tsx                   # React root entry point
 ├── package.json                   # Build configs and script dependencies
 ├── vite.config.ts                 # Dev server configuration
 └── tsconfig.json                  # TypeScript compiler settings
 ```
+
+---
+
+## Security Considerations and Safety
+
+* **Hardware Safety**: When interfacing with microcontrollers directly via hardware serial lines, ensure that voltage levels are compatible (typically 3.3V logic levels). Avoid connecting 5V lines directly to low-voltage pins to prevent hardware damage.
+* **Data Privacy and AI Explanations**: When using the Claude AI Explanation feature, target function decompiled C code is transmitted to Anthropic APIs. Verify that you are permitted to transmit sensitive code blocks prior to calling AI features on proprietary firmware.
+* **Extraction Interruptions**: Keep target devices stable and connected during active extraction sequences. Interruptions in serial communication during bootloader dumps can lead to corrupted hex logs, necessitating a manual chip reset.
+
+---
+
+## Future Development Roadmap
+
+* **Write and Flash Capabilities**: Introduce support for writing and flashing custom or patched binaries back to microcontrollers directly from the web dashboard interface.
+* **Offline Local LLM Support**: Integrate local inference options (such as Ollama, llama.cpp, or local API gateways) to enable offline AI code explanations without cloud dependencies.
+* **Cross-Reference Visualizations**: Develop interactive cross-reference (Xref) mapping and control-flow graph (CFG) visualizers inside the Code Explorer.
+* **Dynamic Analysis Integration**: Support active serial feedback debugging interfaces (such as interactive GDB stubs over Web Serial) for real-time memory monitoring.
+
+---
+
+## Contributing
+
+Contributions to BININO are welcome. To contribute:
+1. Fork the repository.
+2. Create a new topic branch for your feature or bug fix.
+3. Commit your changes with clear, descriptive commit messages.
+4. Push your branch and open a pull request against the main branch.
+
+Ensure that all modifications respect the project styling system and compile cleanly via standard builds (`npm run build`).
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for the full text.
+
+Copyright (c) 2026 Chandan Sai Pavan Padala.
+
