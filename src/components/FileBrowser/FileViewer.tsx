@@ -42,8 +42,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({
   }, [streamedText, explainStatus]);
 
   // Syntax highlighting logic for script files
-  const highlightedHtml = useMemo(() => {
-    if (!content) return '';
+  const highlightedLines = useMemo(() => {
+    if (!content) return [];
     const lines = content.split('\n');
     const escapeHTML = (text: string): string =>
       text
@@ -53,7 +53,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 
-    const highlightedLines = lines.map((line) => {
+    const highlighted = lines.map((line) => {
       let index = 0;
       let result = '';
 
@@ -98,7 +98,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({
       return result;
     });
 
-    return highlightedLines.join('\n');
+    return highlighted;
   }, [content, runtime]);
 
   const handleCopy = () => {
@@ -195,13 +195,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({
     }
   };
 
-  const totalLines = useMemo(() => {
-    return content ? content.split('\n').length : 0;
-  }, [content]);
 
-  const lineNumbersHtml = useMemo(() => {
-    return Array.from({ length: totalLines }, (_, i) => i + 1).join('\n');
-  }, [totalLines]);
 
   return (
     <div 
@@ -266,20 +260,26 @@ export const FileViewer: React.FC<FileViewerProps> = ({
             Select a script file from the explorer list to read contents.
           </div>
         ) : (
-          <div className="flex-1 flex min-h-0 overflow-auto font-mono text-[11px] leading-5 bg-[#0F0F14] select-text">
-            {/* Line Numbers gutter */}
-            <pre 
-              className="py-4 pl-4 pr-3 text-right text-[var(--text-muted)] border-r select-none"
-              style={{ borderColor: 'rgba(255, 255, 255, 0.03)', margin: 0, minWidth: '40px' }}
-            >
-              {lineNumbersHtml}
-            </pre>
-            {/* Highlighted Script code */}
-            <pre 
-              className="flex-1 py-4 px-4 overflow-x-auto whitespace-pre selection:bg-[rgba(255,255,255,0.08)] selection:text-white"
-              style={{ margin: 0, outline: 'none' }}
-              dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-            />
+          <div className="flex-1 overflow-auto relative bg-[#0F0F14] py-4 select-text">
+            {highlightedLines.map((line, i) => (
+              <div key={i + 1} className="group flex leading-5 min-w-fit font-mono text-[11px] hover:bg-[#1C1C24] transition-colors duration-75">
+                {/* Gutter Line Number */}
+                <span 
+                  className="select-none text-right pr-3 pl-4 sticky left-0 z-10 w-12 shrink-0 bg-[#0F0F14] group-hover:bg-[#1C1C24] border-r select-none transition-colors duration-75"
+                  style={{
+                    color: 'var(--text-muted)',
+                    borderColor: 'rgba(255, 255, 255, 0.04)',
+                  }}
+                >
+                  {i + 1}
+                </span>
+                {/* Line Code */}
+                <code 
+                  className="pl-4 whitespace-pre selection:bg-[rgba(255,255,255,0.08)] selection:text-white"
+                  dangerouslySetInnerHTML={{ __html: line || ' ' }}
+                />
+              </div>
+            ))}
           </div>
         )}
       </div>

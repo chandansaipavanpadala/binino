@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { AnalysisResult, FunctionRecord } from '../../types/analysis';
-import { SyntaxHighlighter } from './SyntaxHighlighter';
+import { highlightC, highlightAsm } from './SyntaxHighlighter';
 import { useAIExplain } from '../../hooks/useAIExplain';
 
 interface CodeViewerPaneProps {
@@ -74,10 +74,11 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
     navigator.clipboard.writeText(formatted);
   };
 
-  const codeLines = useMemo(() => {
+  const highlightedLines = useMemo(() => {
     if (!code) return [];
-    return code.split('\n');
-  }, [code]);
+    const html = activeTab === 'c' ? highlightC(code) : highlightAsm(code);
+    return html.split('\n');
+  }, [code, activeTab]);
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden" style={{ backgroundColor: 'var(--bg-inset)' }}>
@@ -200,34 +201,37 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
       </div>
 
       {/* Code Area with line numbers gutter */}
-      <div className="flex-1 overflow-auto relative" style={{ backgroundColor: 'var(--bg-inset)' }}>
+      <div className="flex-1 overflow-auto relative bg-[#0F0F14] py-4 select-text">
         {activeFunction ? (
-          <div className="flex min-h-full min-w-full font-mono text-[10px] leading-5 select-text">
-            {/* Gutter Line Numbers */}
-            <div 
-              className="select-none text-right pr-3 pl-2 sticky left-0 z-10 w-11 flex-shrink-0 py-4"
-              style={{
-                color: 'var(--text-muted)',
-                borderRight: '1px solid var(--border-subtle)',
-                backgroundColor: 'var(--bg-surface)'
-              }}
-            >
-              {codeLines.map((_, i) => (
-                <div
-                  key={i + 1}
+          <div className={`flex flex-col min-h-full font-mono text-[11px] leading-5 select-text ${wordWrap ? 'w-full' : 'min-w-fit'}`}>
+            {highlightedLines.map((line, i) => (
+              <div 
+                key={i + 1} 
+                className={`group flex leading-5 font-mono text-[11px] hover:bg-[#1C1C24] transition-colors duration-75 ${
+                  wordWrap ? 'w-full' : 'min-w-fit'
+                }`}
+              >
+                {/* Gutter Line Number */}
+                <span 
                   onClick={() => handleLineClick(i + 1)}
-                  className="cursor-pointer hover:text-white h-5 leading-5 select-none transition-colors"
+                  className="select-none text-right pr-3 pl-4 sticky left-0 z-10 w-12 shrink-0 bg-[#0F0F14] group-hover:bg-[#1C1C24] border-r select-none transition-colors duration-75 cursor-pointer hover:text-white"
+                  style={{
+                    color: 'var(--text-muted)',
+                    borderColor: 'rgba(255, 255, 255, 0.04)',
+                  }}
                   title="Click to copy filename:line"
                 >
                   {i + 1}
-                </div>
-              ))}
-            </div>
-
-            {/* Code Content Highlight Block */}
-            <div className="flex-1 min-w-0">
-              <SyntaxHighlighter code={code} language={activeTab} wordWrap={wordWrap} />
-            </div>
+                </span>
+                {/* Line Code */}
+                <code 
+                  className={`pl-4 select-text selection:bg-[rgba(255,255,255,0.08)] selection:text-white ${
+                    wordWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'
+                  }`}
+                  dangerouslySetInnerHTML={{ __html: line || ' ' }}
+                />
+              </div>
+            ))}
           </div>
         ) : (
           <div className="w-full h-full flex items-center justify-center text-xs select-none" style={{ color: 'var(--text-muted)' }}>

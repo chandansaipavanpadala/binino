@@ -19,11 +19,374 @@ const MOCK_FILES: Record<string, string> = {
   '/boot.js': `// boot.js -- Espruino startup handler\r\nE.on('init', function() {\r\n  console.log("System initialized.");\r\n});\r\n`
 };
 
+// Helper to query directory tree recursively over Web Serial CDC link
+const queryFilesystemOverSerial = async (port: SerialPort, runtime: string): Promise<FileNode[]> => {
+  if (!port.writable || !port.readable) {
+    throw new Error('Serial port streams are not available.');
+  }
+  const writer = port.writable.getWriter();
+  const reader = port.readable.getReader();
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  
+  const rName = runtime.toLowerCase();
+  
+  try {
+    if (rName === 'micropython' || rName === 'circuitpython') {
+      // 1. Enter Raw REPL (Ctrl+A)
+      await writer.write(encoder.encode('\r\n\x01'));
+      
+      // Wait for Raw REPL prompt
+      let buffer = '';
+      const startTime = Date.now();
+      while (Date.now() - startTime < 1500) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) {
+          buffer += decoder.decode(value);
+          if (buffer.includes('raw REPL; ready') || buffer.includes('>')) {
+            break;
+          }
+        }
+      }
+      
+      // 2. Write the JSON printer script
+      const listScript = `
+import os, json
+def list_dir(d):
+  r=[]
+  try:
+    for e in os.listdir(d):
+      p=d+('/' if d!='/' else '')+e
+      try:
+        s=os.stat(p)
+        is_dir=(s[0]&0x4000)!=0
+      except:
+        is_dir=False
+      if is_dir:
+        r.append({'name':e,'path':p,'type':'directory','children':list_dir(p)})
+      else:
+        r.append({'name':e,'path':p,'type':'file','size':s[6] if len(s)>6 else 0})
+  except: pass
+  return r
+print('BININO_FS_START' + json.dumps(list_dir('/')) + 'BININO_FS_END')
+`;
+      await writer.write(encoder.encode(listScript + '\x04')); // Ctrl+D to execute
+      
+      // 3. Read output
+      buffer = '';
+      const endMarker = 'BININO_FS_END';
+      const readStartTime = Date.now();
+      while (Date.now() - readStartTime < 4000) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) {
+          buffer += decoder.decode(value);
+          if (buffer.includes(endMarker)) {
+            break;
+          }
+        }
+      }
+      
+      // 4. Exit Raw REPL (Ctrl+B)
+      await writer.write(encoder.encode('\x02'));
+      
+      // Extract contents
+      const startMarker = 'BININO_FS_START';
+      const startIdx = buffer.indexOf(startMarker);
+      const endIdx = buffer.indexOf(endMarker);
+      if (startIdx !== -1 && endIdx !== -1) {
+        const jsonStr = buffer.substring(startIdx + startMarker.length, endIdx).trim();
+        return JSON.parse(jsonStr);
+      }
+    } 
+    else if (rName === 'nodemcu' || rName === 'lua') {
+      const luaScript = `
+(function()
+  local r = {}
+  for k,v in pairs(file.list()) do table.insert(r, {name=k,path="/"..k,type="file",size=v}) end
+  print("BININO_FS_START" .. sjson.encode(r) .. "BININO_FS_END")
+end)()
+\r\n`;
+      await writer.write(encoder.encode(luaScript));
+      
+      let buffer = '';
+      const endMarker = 'BININO_FS_END';
+      const readStartTime = Date.now();
+      while (Date.now() - readStartTime < 3000) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) {
+          buffer += decoder.decode(value);
+          if (buffer.includes(endMarker)) {
+            break;
+          }
+        }
+      }
+      
+      const startMarker = 'BININO_FS_START';
+      const startIdx = buffer.indexOf(startMarker);
+      const endIdx = buffer.indexOf(endMarker);
+      if (startIdx !== -1 && endIdx !== -1) {
+        const jsonStr = buffer.substring(startIdx + startMarker.length, endIdx).trim();
+        return JSON.parse(jsonStr);
+      }
+    }
+    else if (rName === 'espruino') {
+      const jsScript = `
+(function(){
+  var list = require("Storage").list();
+  var files = [];
+  for (var i=0; i<list.length; i++) {
+    var n = list[i];
+    files.push({name:n,path:"/"+n,type:"file",size:require("Storage").read(n).length});
+  }
+  print("BININO_FS_START" + JSON.stringify(files) + "BININO_FS_END");
+})()
+\r\n`;
+      await writer.write(encoder.encode(jsScript));
+      
+      let buffer = '';
+      const endMarker = 'BININO_FS_END';
+      const readStartTime = Date.now();
+      while (Date.now() - readStartTime < 3000) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) {
+          buffer += decoder.decode(value);
+          if (buffer.includes(endMarker)) {
+            break;
+          }
+        }
+      }
+      
+      const startMarker = 'BININO_FS_START';
+      const startIdx = buffer.indexOf(startMarker);
+      const endIdx = buffer.indexOf(endMarker);
+      if (startIdx !== -1 && endIdx !== -1) {
+        const jsonStr = buffer.substring(startIdx + startMarker.length, endIdx).trim();
+        return JSON.parse(jsonStr);
+      }
+    }
+  } catch (err) {
+    console.error('Error querying directory tree over serial:', err);
+  } finally {
+    try { writer.releaseLock(); } catch (_) {}
+    try {
+      await reader.cancel();
+      reader.releaseLock();
+    } catch (_) {}
+  }
+  return [];
+};
+
+// Helper to read file contents recursively/securely as Base64 over serial
+const readFileOverSerial = async (port: SerialPort, runtime: string, filePath: string): Promise<string> => {
+  if (!port.writable || !port.readable) {
+    throw new Error('Serial port streams are not available.');
+  }
+  const writer = port.writable.getWriter();
+  const reader = port.readable.getReader();
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  
+  const rName = runtime.toLowerCase();
+  
+  try {
+    if (rName === 'micropython' || rName === 'circuitpython') {
+      // 1. Enter Raw REPL (Ctrl+A)
+      await writer.write(encoder.encode('\r\n\x01'));
+      
+      let buffer = '';
+      const startTime = Date.now();
+      while (Date.now() - startTime < 1500) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) {
+          buffer += decoder.decode(value);
+          if (buffer.includes('raw REPL; ready') || buffer.includes('>')) {
+            break;
+          }
+        }
+      }
+      
+      // Clean path backslashes and escape quotes
+      const cleanPath = filePath.replace(/'/g, "\\'");
+      
+      // 2. Send python read file script (Base64 wrapper)
+      const readScript = `
+import ubinascii
+try:
+  with open('${cleanPath}', 'rb') as f:
+    print('BININO_FILE_START' + ubinascii.b2a_base64(f.read()).decode('ascii') + 'BININO_FILE_END')
+except Exception as e:
+  print('BININO_FILE_START_ERR:' + str(e) + 'BININO_FILE_END')
+`;
+      await writer.write(encoder.encode(readScript + '\x04')); // Ctrl+D to execute
+      
+      // 3. Read output
+      buffer = '';
+      const endMarker = 'BININO_FILE_END';
+      const readStartTime = Date.now();
+      while (Date.now() - readStartTime < 4000) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) {
+          buffer += decoder.decode(value);
+          if (buffer.includes(endMarker)) {
+            break;
+          }
+        }
+      }
+      
+      // 4. Exit Raw REPL (Ctrl+B)
+      await writer.write(encoder.encode('\x02'));
+      
+      const startMarker = 'BININO_FILE_START';
+      const errMarker = 'BININO_FILE_START_ERR:';
+      
+      if (buffer.includes(errMarker)) {
+        const startIdx = buffer.indexOf(errMarker);
+        const endIdx = buffer.indexOf(endMarker);
+        return `Error: ${buffer.substring(startIdx + errMarker.length, endIdx).trim()}`;
+      }
+      
+      const startIdx = buffer.indexOf(startMarker);
+      const endIdx = buffer.indexOf(endMarker);
+      if (startIdx !== -1 && endIdx !== -1) {
+        const base64Str = buffer.substring(startIdx + startMarker.length, endIdx).trim();
+        try {
+          const binaryString = window.atob(base64Str);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          return new TextDecoder().decode(bytes);
+        } catch (e) {
+          return `Error: Failed to base64 decode script contents. ${e}`;
+        }
+      }
+    }
+    else if (rName === 'nodemcu' || rName === 'lua') {
+      const cleanPath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
+      const luaScript = `
+(function()
+  if not file.exists("${cleanPath}") then
+    print("BININO_FILE_START_ERR:File not foundBININO_FILE_END")
+    return
+  end
+  file.open("${cleanPath}", "r")
+  local data = file.read()
+  file.close()
+  if data then
+    print("BININO_FILE_START" .. encoder.toBase64(data) .. "BININO_FILE_END")
+  else
+    print("BININO_FILE_STARTBININO_FILE_END")
+  end
+end)()
+\r\n`;
+      await writer.write(encoder.encode(luaScript));
+      
+      let buffer = '';
+      const endMarker = 'BININO_FILE_END';
+      const readStartTime = Date.now();
+      while (Date.now() - readStartTime < 3000) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) {
+          buffer += decoder.decode(value);
+          if (buffer.includes(endMarker)) {
+            break;
+          }
+        }
+      }
+      
+      const startMarker = 'BININO_FILE_START';
+      const errMarker = 'BININO_FILE_START_ERR:';
+      if (buffer.includes(errMarker)) {
+        return `Error: File ${cleanPath} not found on Lua flash.`;
+      }
+      
+      const startIdx = buffer.indexOf(startMarker);
+      const endIdx = buffer.indexOf(endMarker);
+      if (startIdx !== -1 && endIdx !== -1) {
+        const base64Str = buffer.substring(startIdx + startMarker.length, endIdx).trim();
+        try {
+          return window.atob(base64Str);
+        } catch (e) {
+          return `Error: Base64 decode failed. ${e}`;
+        }
+      }
+    }
+    else if (rName === 'espruino') {
+      const cleanPath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
+      const jsScript = `
+(function() {
+  var content = require("Storage").read("${cleanPath}");
+  if (content === undefined) {
+    print("BININO_FILE_START_ERR:File not foundBININO_FILE_END");
+  } else {
+    print("BININO_FILE_START" + btoa(content) + "BININO_FILE_END");
+  }
+})()
+\r\n`;
+      await writer.write(encoder.encode(jsScript));
+      
+      let buffer = '';
+      const endMarker = 'BININO_FILE_END';
+      const readStartTime = Date.now();
+      while (Date.now() - readStartTime < 3000) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) {
+          buffer += decoder.decode(value);
+          if (buffer.includes(endMarker)) {
+            break;
+          }
+        }
+      }
+      
+      const startMarker = 'BININO_FILE_START';
+      const errMarker = 'BININO_FILE_START_ERR:';
+      if (buffer.includes(errMarker)) {
+        return `Error: File ${cleanPath} not found in Espruino Storage.`;
+      }
+      
+      const startIdx = buffer.indexOf(startMarker);
+      const endIdx = buffer.indexOf(endMarker);
+      if (startIdx !== -1 && endIdx !== -1) {
+        const base64Str = buffer.substring(startIdx + startMarker.length, endIdx).trim();
+        try {
+          return window.atob(base64Str);
+        } catch (e) {
+          return `Error: Base64 decode failed. ${e}`;
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error reading file over serial:', err);
+    return `Error reading file: ${err}`;
+  } finally {
+    try { writer.releaseLock(); } catch (_) {}
+    try {
+      await reader.cancel();
+      reader.releaseLock();
+    } catch (_) {}
+  }
+  return '';
+};
+
 export const FileBrowser: React.FC = () => {
   const {
     selectedArch,
     detectedRuntime,
-    appendLog
+    appendLog,
+    connectionStatus,
+    portRef,
+    pauseReadLoop,
+    resumeReadLoop,
+    isDemoMode
   } = useAppContext();
 
   const [activeTab, setActiveTab] = useState<'files' | 'repl'>('files');
@@ -70,14 +433,29 @@ export const FileBrowser: React.FC = () => {
     setLoadingFiles(true);
     appendLog('INFO', '[Filesystem] Querying MCU filesystem...');
     
-    // Simulate serial communication lag
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    const mockTree = generateMockFiles();
-    setFiles(mockTree);
+    if (connectionStatus === 'connected' && !isDemoMode && portRef.current) {
+      try {
+        await pauseReadLoop();
+        const mcuFiles = await queryFilesystemOverSerial(portRef.current, detectedRuntime);
+        setFiles(mcuFiles);
+        appendLog('INFO', `[Filesystem] Real MCU files loaded successfully (found ${mcuFiles.length} root items).`);
+      } catch (err: any) {
+        appendLog('ERROR', `[Filesystem] Query failed: ${err.message || err}`);
+        const mockTree = generateMockFiles();
+        setFiles(mockTree);
+      } finally {
+        resumeReadLoop();
+      }
+    } else {
+      // Simulate serial communication lag
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      const mockTree = generateMockFiles();
+      setFiles(mockTree);
+      appendLog('INFO', '[Filesystem] Emulated files loaded (Demo/Offline Mode).');
+    }
+    
     setLoadingFiles(false);
-    appendLog('INFO', '[Filesystem] Filesystem tree loaded successfully.');
-  }, [generateMockFiles, appendLog]);
+  }, [connectionStatus, isDemoMode, portRef, detectedRuntime, generateMockFiles, appendLog, pauseReadLoop, resumeReadLoop]);
 
   useEffect(() => {
     loadFilesystem();
@@ -87,9 +465,6 @@ export const FileBrowser: React.FC = () => {
     setSelectedFile(file);
     setLoadingContent(true);
     appendLog('INFO', `[Filesystem] Reading script contents: ${file.name}`);
-
-    // Wait for read transition
-    await new Promise((resolve) => setTimeout(resolve, 400));
 
     if (file.isLocal && file.handle) {
       // Direct File System Access API read
@@ -101,8 +476,20 @@ export const FileBrowser: React.FC = () => {
         console.error('Failed to read local file:', err);
         setFileContent(`# Error reading local file ${file.name}`);
       }
+    } else if (connectionStatus === 'connected' && !isDemoMode && portRef.current) {
+      try {
+        await pauseReadLoop();
+        const text = await readFileOverSerial(portRef.current, detectedRuntime, file.path);
+        setFileContent(text);
+      } catch (err: any) {
+        appendLog('ERROR', `[Filesystem] Read failed for ${file.name}: ${err.message || err}`);
+        setFileContent(`# Error reading script from serial link.`);
+      } finally {
+        resumeReadLoop();
+      }
     } else {
-      // Mock lookup or fallback read
+      // Wait for read transition
+      await new Promise((resolve) => setTimeout(resolve, 400));
       const text = MOCK_FILES[file.path] || `# Script contents for: ${file.name}\r\n# (read from serial)`;
       setFileContent(text);
     }
@@ -128,6 +515,8 @@ export const FileBrowser: React.FC = () => {
             if (n.isLocal && n.handle) {
               const fileObj = await n.handle.getFile();
               text = await fileObj.text();
+            } else if (connectionStatus === 'connected' && !isDemoMode && portRef.current) {
+              text = await readFileOverSerial(portRef.current, detectedRuntime, n.path);
             } else {
               text = MOCK_FILES[n.path] || `# contents of ${n.name}`;
             }

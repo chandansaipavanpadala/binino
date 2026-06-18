@@ -197,7 +197,8 @@ export const useSerialPort = () => {
 
     setConnectionStatus('connecting');
     setErrorMsg(null);
-    appendLog('INFO', `Initiating connection (Arch: ${selectedArch.toUpperCase()}, Baud: ${selectedBaud})...`);
+    const displayBaud = selectedBaud === 0 ? '0 (USB CDC)' : selectedBaud;
+    appendLog('INFO', `Initiating connection (Arch: ${selectedArch.toUpperCase()}, Baud: ${displayBaud})...`);
 
     let port: SerialPort | null = null;
     try {
@@ -228,10 +229,14 @@ export const useSerialPort = () => {
         displayName,
       });
 
-      appendLog('INFO', `Opening ${displayName} at ${selectedBaud} baud...`);
+      const openBaud = selectedBaud === 0 ? 115200 : selectedBaud;
+      appendLog(
+        'INFO',
+        `Opening ${displayName} at ${openBaud} baud${selectedBaud === 0 ? ' (default CDC baud for USB-only device)' : ''}...`
+      );
 
       // Open connection
-      await port.open({ baudRate: selectedBaud });
+      await port.open({ baudRate: openBaud });
 
       setConnectionStatus('connected');
       setConnectionTimestamp(getFormattedTime());
