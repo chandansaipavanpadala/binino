@@ -71,25 +71,103 @@ export const useSmartDetect = () => {
     }
 
     if (isDemoMode) {
-      // Simulate 1s delay and resolve to MicroPython
+      // Simulate 1s delay and resolve
       await new Promise(r => setTimeout(r, 1000));
       setDetectStatus('detected');
-      setDetectedRuntime('micropython');
-      setRuntimeVersion('1.22.0');
-      setConfidence('high');
-      setRecommendedAction('file-browser');
-      setDetectionMessage('MicroPython detected (confidence: high). Bypassing binary extraction.');
-      setFilesystemCommands({
-        list: "import os; print(os.listdir('/'))",
-        read: "f=open('{filename}'); print(f.read()); f.close()",
-        size: "import os; print(os.stat('{filename}')[6])",
-        space: "import os; s=os.statvfs('/'); print(s[0]*s[3])"
-      });
-      appendLog('INFO', '[SmartDetect] MicroPython runtime detected. File Browser unlocked.');
-      return {
-        runtime: 'micropython',
-        action: 'file-browser'
-      };
+      
+      if (arch === 'esp32s2') {
+        setDetectedRuntime('micropython');
+        setRuntimeVersion('1.22.0');
+        setConfidence('high');
+        setRecommendedAction('file-browser');
+        setDetectionMessage('MicroPython detected (confidence: high). Bypassing binary extraction.');
+        setFilesystemCommands({
+          list: "import os; print(os.listdir('/'))",
+          read: "f=open('{filename}'); print(f.read()); f.close()",
+          size: "import os; print(os.stat('{filename}')[6])",
+          space: "import os; s=os.statvfs('/'); print(s[0]*s[3])"
+        });
+        appendLog('INFO', '[SmartDetect] MicroPython runtime detected. File Browser unlocked.');
+        return {
+          runtime: 'micropython',
+          action: 'file-browser' as RecommendedAction
+        };
+      } else if (arch === 'esp32s3') {
+        setDetectedRuntime('circuitpython');
+        setRuntimeVersion('9.0.0');
+        setConfidence('high');
+        setRecommendedAction('file-browser');
+        setDetectionMessage('CircuitPython detected (confidence: high). Bypassing binary extraction.');
+        setFilesystemCommands({
+          list: "import os; print(os.listdir('/'))",
+          read: "f=open('{filename}'); print(f.read()); f.close()",
+          size: "import os; print(os.stat('{filename}')[6])",
+          space: "import os; s=os.statvfs('/'); print(s[0]*s[3])"
+        });
+        appendLog('INFO', '[SmartDetect] CircuitPython runtime detected. File Browser unlocked.');
+        return {
+          runtime: 'circuitpython',
+          action: 'file-browser' as RecommendedAction
+        };
+      } else if (arch === 'esp32c3') {
+        setDetectedRuntime('espruino');
+        setRuntimeVersion('2v21');
+        setConfidence('high');
+        setRecommendedAction('file-browser');
+        setDetectionMessage('Espruino JS runtime detected (confidence: high). Bypassing binary extraction.');
+        setFilesystemCommands({
+          list: "require('fs').readdirSync('/')",
+          read: "require('fs').readFileSync('{filename}')",
+          size: "require('fs').statSync('{filename}').size",
+        });
+        appendLog('INFO', '[SmartDetect] Espruino JS runtime detected. File Browser unlocked.');
+        return {
+          runtime: 'espruino',
+          action: 'file-browser' as RecommendedAction
+        };
+      } else if (arch === 'esp32c6') {
+        setDetectedRuntime('nodemcu');
+        setRuntimeVersion('3.0.0');
+        setConfidence('high');
+        setRecommendedAction('file-browser');
+        setDetectionMessage('NodeMCU Lua runtime detected (confidence: high). Bypassing binary extraction.');
+        setFilesystemCommands({
+          list: "for k,v in pairs(file.list()) do print(k,v) end",
+          read: "if file.open('{filename}','r') then print(file.read()); file.close() end",
+          size: "local s=file.list(); print(s['{filename}'] or 0)",
+        });
+        appendLog('INFO', '[SmartDetect] NodeMCU Lua runtime detected. File Browser unlocked.');
+        return {
+          runtime: 'nodemcu',
+          action: 'file-browser' as RecommendedAction
+        };
+      } else if (arch === 'esp8266') {
+        setDetectedRuntime('at-firmware');
+        setRuntimeVersion('1.7.4');
+        setConfidence('high');
+        setRecommendedAction('terminal');
+        setDetectionMessage('AT Command firmware detected (confidence: high). Routing to shell console.');
+        setFilesystemCommands(null);
+        appendLog('INFO', '[SmartDetect] AT Command interface detected. Routing to console terminal.');
+        return {
+          runtime: 'at-firmware',
+          action: 'terminal' as RecommendedAction
+        };
+      } else {
+        // Default to compiled firmware for esp32 and other architectures.
+        // This ensures the Flash Extractor opens by default when entering Demo Mode.
+        setDetectedRuntime('compiled');
+        setRuntimeVersion(null);
+        setConfidence('low');
+        setRecommendedAction('extract');
+        setDetectionMessage('No interpreted runtime detected. Ready for firmware extraction.');
+        setFilesystemCommands(null);
+        appendLog('INFO', '[SmartDetect] Probes completed. No interpreted runtime found. Proceeding to binary extraction.');
+        return {
+          runtime: 'compiled',
+          action: 'extract' as RecommendedAction
+        };
+      }
     }
 
     if (!port || !port.readable || !port.writable) {

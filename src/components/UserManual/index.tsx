@@ -76,7 +76,7 @@ Troubleshooting:
   {
     id: 'smart-detect',
     title: 'Smart Runtime Detection & File Browser',
-    content: `BININO v2.0.4 introduces automated Smart Runtime Detection and an interactive File Browser for interpreted environments. 
+    content: `BININO v2.0.5 introduces automated Smart Runtime Detection and an interactive File Browser for interpreted environments. 
 
 Smart Runtime Detector:
 When a device bridge is established, the tool automatically sends background command probes (including REPL sequences, Lua triggers, JS queries, and AT sync requests) to identify the running firmware category. 

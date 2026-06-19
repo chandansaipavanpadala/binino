@@ -16,7 +16,13 @@ export const Navbar: React.FC = () => {
       }}
     >
       {/* Left: Brand & Version */}
-      <div className="flex items-center space-x-3 cursor-pointer" onClick={() => navigate('/')}>
+      <div
+        className="flex items-center space-x-3 cursor-pointer"
+        onClick={() => {
+          setIsDemoMode(false);
+          navigate('/');
+        }}
+      >
         <div
           className="p-1 rounded flex items-center justify-center bg-[#1A1A1A]"
           style={{ border: '1px solid var(--border-subtle)' }}
@@ -30,7 +36,7 @@ export const Navbar: React.FC = () => {
           className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded-full bg-[#1A1A1A] text-[#888888]"
           style={{ border: '1px solid var(--border-subtle)' }}
         >
-          v2.0.4
+          v2.0.5
         </span>
       </div>
 

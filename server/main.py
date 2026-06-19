@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Binino Backend Handoff Server",
     description="Python API bridging raw binary firmware uploads and Ghidra decompilation",
-    version="2.0.4",
+    version="2.0.5",
     lifespan=lifespan
 )
 
@@ -67,4 +67,4 @@ app.include_router(detect.router)
 
 @app.get("/")
 def read_root():
-    return {"name": "Binino API", "version": "2.0.4", "status": "online"}
+    return {"name": "Binino API", "version": "2.0.5", "status": "online"}
