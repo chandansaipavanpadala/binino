@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { MCU_REGISTRY } from '../utils/mcuRegistry';
 
 export type DetectStatus = 'idle' | 'probing' | 'detected' | 'error';
 export type Confidence = 'high' | 'medium' | 'low';
@@ -43,6 +44,31 @@ export const useSmartDetect = () => {
     setDetectionMessage('Initializing Smart Runtime Detector...');
     
     appendLog('INFO', '[SmartDetect] Probing serial interface for active runtime environments...');
+
+    const mcu = MCU_REGISTRY[arch];
+    if (arch === 'nrf52840') {
+      appendLog('INFO', '[INFO] nRF52840 detected — if device resets, hold reset and try again.');
+    }
+
+    if (mcu && mcu.common_runtimes && mcu.common_runtimes.length === 1 && mcu.common_runtimes[0] === 'compiled') {
+      appendLog('INFO', '[SmartDetect] AVR/PIC/MSP430 — skipping runtime probes.');
+      const fallbackResult = {
+        runtime: 'compiled',
+        confidence: 'high' as Confidence,
+        runtime_version: null,
+        action: 'extract' as RecommendedAction,
+        message: 'AVR/PIC/MSP430 — skipping runtime probes.',
+        filesystem_commands: null,
+        frozen_module_hint: false
+      };
+      setDetectStatus('detected');
+      setDetectedRuntime(fallbackResult.runtime);
+      setConfidence(fallbackResult.confidence);
+      setRecommendedAction(fallbackResult.action);
+      setDetectionMessage(fallbackResult.message);
+      setFilesystemCommands(null);
+      return fallbackResult;
+    }
 
     if (isDemoMode) {
       // Simulate 1s delay and resolve to MicroPython
@@ -93,13 +119,25 @@ export const useSmartDetect = () => {
       };
 
       // 1. REPL probe
-      await writeData('\r\n\x03\x04\r\n');
-      await new Promise(r => setTimeout(r, 150));
-      // 2. Lua/Espruino probe
-      await writeData('\r\n');
-      await new Promise(r => setTimeout(r, 150));
-      // 3. AT probe
-      await writeData('AT\r\n');
+      const isSTM32 = mcu && (mcu.family === 'STM32' || mcu.mcu_id.startsWith('stm32') || mcu.family === 'STMicroelectronics');
+
+      if (isSTM32) {
+        // STM32: REPL probe, then STM32 0x7F autobaud sync byte (skip AT/Lua/JS probes)
+        await writeData('\r\n\x03\x04\r\n');
+        await new Promise(r => setTimeout(r, 150));
+        if (writer) {
+          await writer.write(new Uint8Array([0x7F]));
+        }
+        await new Promise(r => setTimeout(r, 150));
+      } else {
+        await writeData('\r\n\x03\x04\r\n');
+        await new Promise(r => setTimeout(r, 150));
+        // 2. Lua/Espruino probe
+        await writeData('\r\n');
+        await new Promise(r => setTimeout(r, 150));
+        // 3. AT probe
+        await writeData('AT\r\n');
+      }
 
       // Release write lock to allow future uses
       writer.releaseLock();

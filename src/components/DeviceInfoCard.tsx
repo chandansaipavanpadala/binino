@@ -111,7 +111,7 @@ export const DeviceInfoCard: React.FC<DeviceInfoCardProps> = ({
           <div>
             <span className="block mb-0.5 text-[10px] uppercase tracking-wider font-mono" style={{ color: 'var(--text-muted)' }}>Baud Rate</span>
             <span className="font-mono block" style={{ color: 'var(--text-primary)' }}>
-              {isConnected ? (selectedBaud === 0 ? 'N/A (USB CDC)' : `${selectedBaud} bps`) : '—'}
+              {isConnected ? (selectedBaud === 0 ? 'USB CDC' : `${selectedBaud} bps`) : '—'}
             </span>
           </div>
           <div>

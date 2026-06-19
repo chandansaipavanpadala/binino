@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { AnalysisResult } from '../types/analysis';
 
 export type ExplainStatus = 'idle' | 'loading' | 'streaming' | 'done' | 'error';
@@ -17,6 +17,17 @@ export const useAIExplain = (isDemoMode: boolean) => {
   const simIntervalRef = useRef<any>(null);
   const simTimeoutRef = useRef<any>(null);
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+      if (simTimeoutRef.current) clearTimeout(simTimeoutRef.current);
+      if (readerRef.current) {
+        try { readerRef.current.cancel(); } catch (_) {}
+      }
+    };
+  }, []);
 
   const clearExplanation = useCallback(() => {
     // Clear any running timers

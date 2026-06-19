@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { getFormattedTime } from '../utils/time';
 import { useSerialPort } from '../hooks/useSerialPort';
 import { useFlashExtractor } from '../hooks/useFlashExtractor';
 import { useBackendHandoff } from '../hooks/useBackendHandoff';
@@ -155,8 +156,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         usbVendorId: 0x1A86,
         usbProductId: 0x7523,
       });
-      const d = new Date();
-      const now = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}.${d.getMilliseconds().toString().padStart(3, '0')}`;
+      const now = getFormattedTime();
       serial.setConnectionTimestamp(now);
       serial.setTerminalLogs([
         { id: 'demo-1', timestamp: now, level: 'INFO', message: 'Hardware emulation active: Demo Mode enabled.' },

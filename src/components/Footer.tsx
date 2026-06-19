@@ -22,7 +22,7 @@ export const Footer: React.FC = () => {
           className="px-1.5 py-0.5 rounded text-[9px] font-mono"
           style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}
         >
-          v2.0.0
+          v2.0.4
         </span>
       </div>
 

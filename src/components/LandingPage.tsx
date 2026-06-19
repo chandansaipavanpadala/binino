@@ -65,7 +65,7 @@ const LandingPage: React.FC = () => {
           {/* Version badge */}
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-[11px] font-mono tracking-wide" style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--status-live)' }}></span>
-            <span>v2.0.0 — Production Release</span>
+            <span>v2.0.4 — Production Release</span>
           </div>
 
           {/* Wordmark */}
@@ -129,7 +129,7 @@ const LandingPage: React.FC = () => {
 
       {/* Footer (inline on landing) */}
       <footer className="py-4 px-6 flex items-center justify-between text-[10px]" style={{ borderTop: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
-        <span>BININO v2.0.0</span>
+        <span>BININO v2.0.4</span>
         <span>Built by Chandan Sai Pavan Padala</span>
         <a href="https://github.com/chandansaipavanpadala/binino" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-1 hover:opacity-80 transition-opacity" style={{ color: 'var(--text-muted)' }}>
           <Github className="h-3 w-3" />

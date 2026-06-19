@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Folder, FolderOpen, FileCode, RefreshCw, HardDrive, AlertCircle } from 'lucide-react';
+import { useAppContext } from '../../context/AppContext';
 
 export interface FileNode {
   name: string;
@@ -31,6 +32,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
   detectedRuntime
 }) => {
   const [expandedDirs, setExpandedDirs] = useState<Record<string, boolean>>({ '/': true });
+  const { setForceBinaryExtraction } = useAppContext();
 
   const toggleDir = (path: string) => {
     setExpandedDirs((prev) => ({ ...prev, [path]: !prev[path] }));
@@ -46,6 +48,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
   const handleBrowseLocalDrive = async () => {
     try {
       if (!('showDirectoryPicker' in window)) {
+        console.warn('showDirectoryPicker is not supported in this browser window context.');
         alert('The Directory Picker API is not supported in this browser. Please use Google Chrome or Microsoft Edge.');
         return;
       }
@@ -89,6 +92,9 @@ export const FileTree: React.FC<FileTreeProps> = ({
       onLocalFilesLoaded(loadedNodes);
 
     } catch (err: any) {
+      if (err.name === 'AbortError') {
+        return;
+      }
       console.warn('Directory Picker cancelled or failed:', err);
     }
   };
@@ -193,14 +199,22 @@ export const FileTree: React.FC<FileTreeProps> = ({
       {/* Files Tree */}
       <div className="flex-1 overflow-y-auto py-2">
         {files.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full p-4 text-center text-[var(--text-muted)] space-y-2 select-none">
+          <div className="flex flex-col items-center justify-center h-full p-6 text-center text-[var(--text-muted)] space-y-3 select-none">
             <AlertCircle className="h-5 w-5 text-gray-600" />
-            <div className="text-[11px]">
+            <div className="text-xs max-w-[180px] leading-relaxed">
               {loading 
                 ? 'Loading device filesystem tree...' 
-                : 'No files found. Hit refresh or mount a local CIRCUITPY drive.'
+                : 'No files found. Code may be frozen into firmware binary.'
               }
             </div>
+            {!loading && (
+              <button
+                onClick={() => setForceBinaryExtraction(true)}
+                className="px-3 py-1.5 rounded text-[10px] font-mono font-semibold transition-all hover:bg-[#222222] border border-[#222222] text-[#CCCCCC]"
+              >
+                Switch to Binary Extraction
+              </button>
+            )}
           </div>
         ) : (
           files.map((file) => renderNode(file))

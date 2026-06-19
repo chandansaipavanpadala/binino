@@ -76,7 +76,7 @@ Troubleshooting:
   {
     id: 'smart-detect',
     title: 'Smart Runtime Detection & File Browser',
-    content: `BININO v2.0.0 introduces automated Smart Runtime Detection and an interactive File Browser for interpreted environments. 
+    content: `BININO v2.0.4 introduces automated Smart Runtime Detection and an interactive File Browser for interpreted environments. 
 
 Smart Runtime Detector:
 When a device bridge is established, the tool automatically sends background command probes (including REPL sequences, Lua triggers, JS queries, and AT sync requests) to identify the running firmware category. 
@@ -308,8 +308,51 @@ export const UserManual: React.FC = () => {
     };
   }, []);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap implementation
+  useEffect(() => {
+    const handleFocusTrap = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || !containerRef.current) return;
+
+      const focusable = containerRef.current.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+
+      const first = focusable[0] as HTMLElement;
+      const last = focusable[focusable.length - 1] as HTMLElement;
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          last.focus();
+          e.preventDefault();
+        }
+      } else {
+        if (document.activeElement === last) {
+          first.focus();
+          e.preventDefault();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleFocusTrap);
+    return () => window.removeEventListener('keydown', handleFocusTrap);
+  }, []);
+
+  // Handle escape key to close/navigate back
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        navigate(-1);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigate]);
+
   return (
-    <div className="h-screen flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
+    <div ref={containerRef} className="h-screen flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
       {/* Header */}
       <div className="w-full px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
         <div className="flex items-center space-x-4">

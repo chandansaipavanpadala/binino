@@ -75,13 +75,14 @@ export const NavigatorPane: React.FC<NavigatorPaneProps> = ({
   }, [activeTab]);
 
   // --- VIRTUALIZATION CONSTANTS FOR FUNCTIONS ---
-  const ROW_HEIGHT = 38;
-  const OVERSCAN = 5;
+  const ROW_HEIGHT = 36;
+  const OVERSCAN = 10;
 
   const virtualFunctions = useMemo(() => {
     const total = filteredFunctions.length;
+    const viewportHeight = scrollContainerRef.current?.clientHeight || 600;
     const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
-    const endIndex = Math.min(total, Math.ceil((scrollTop + 500) / ROW_HEIGHT) + OVERSCAN);
+    const endIndex = Math.min(total, Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + OVERSCAN);
     
     const items = [];
     for (let i = startIndex; i < endIndex; i++) {
@@ -175,9 +176,9 @@ export const NavigatorPane: React.FC<NavigatorPaneProps> = ({
       </div>
 
       {/* Pane Content Area */}
-      <div className="flex-1 overflow-y-auto" ref={scrollContainerRef} onScroll={handleScroll}>
+      <div className="flex-1 min-h-0 flex flex-col">
         {activeTab === 'functions' && (
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col h-full min-h-0">
             {/* Pinned Entry Point Function */}
             {entryFunction && !filterText && (
               <div 
@@ -241,6 +242,7 @@ export const NavigatorPane: React.FC<NavigatorPaneProps> = ({
                 </div>
               ) : (
                 <div
+                  ref={scrollContainerRef}
                   className="overflow-y-auto h-full w-full"
                   onScroll={handleScroll}
                 >
@@ -311,7 +313,7 @@ export const NavigatorPane: React.FC<NavigatorPaneProps> = ({
         )}
 
         {activeTab === 'strings' && (
-          <div className="p-3">
+          <div className="overflow-y-auto flex-1 min-h-0 p-3">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr 
@@ -359,7 +361,7 @@ export const NavigatorPane: React.FC<NavigatorPaneProps> = ({
         )}
 
         {activeTab === 'symbols' && (
-          <div className="p-3">
+          <div className="overflow-y-auto flex-1 min-h-0 p-3">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr 

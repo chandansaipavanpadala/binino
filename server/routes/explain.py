@@ -153,7 +153,7 @@ async def real_explain_generator(api_key: str, req: ExplainRequest):
 async def explain_function(request: Request, req: ExplainRequest):
     """Endpoint facilitating real-time streamed explanations of decompiled logic."""
     # Apply IP-based rate limiting
-    ip = request.client.host if request.client else "unknown"
+    ip = request.headers.get('X-Forwarded-For', request.client.host if request.client else 'unknown').split(',')[0].strip()
     if not check_rate_limit(ip):
         raise HTTPException(status_code=429, detail="Rate limit exceeded. Max 10 requests per minute.")
 
@@ -315,7 +315,7 @@ async def real_source_explain_generator(api_key: str, system_prompt: str, req: E
 async def explain_source_code(request: Request, req: ExplainSourceRequest):
     """Endpoint facilitating real-time streamed explanations of script source files."""
     # Apply IP-based rate limiting
-    ip = request.client.host if request.client else "unknown"
+    ip = request.headers.get('X-Forwarded-For', request.client.host if request.client else 'unknown').split(',')[0].strip()
     if not check_rate_limit(ip):
         raise HTTPException(status_code=429, detail="Rate limit exceeded. Max 10 requests per minute.")
 

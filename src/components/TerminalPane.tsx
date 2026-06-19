@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TerminalLog } from '../hooks/useSerialPort';
 import { Trash2, Terminal } from 'lucide-react';
 
@@ -8,12 +8,30 @@ interface TerminalPaneProps {
 }
 
 export const TerminalPane: React.FC<TerminalPaneProps> = ({ logs, clearLogs }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const userScrolledUpRef = useRef(false);
+  const [showJumpButton, setShowJumpButton] = useState(false);
 
-  // Auto-scroll to the bottom when logs list updates
+  // Auto-scroll to the bottom when logs list updates if user hasn't scrolled up
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!userScrolledUpRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [logs]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 15;
+    userScrolledUpRef.current = !isAtBottom;
+    setShowJumpButton(!isAtBottom);
+  };
+
+  const jumpToLatest = () => {
+    userScrolledUpRef.current = false;
+    setShowJumpButton(false);
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   // Map levels to color variables
   const getLevelStyle = (level: TerminalLog['level']) => {
@@ -63,9 +81,11 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({ logs, clearLogs }) =
 
       {/* Terminal logs list */}
       <div
+        ref={containerRef}
+        onScroll={handleScroll}
         role="log"
         aria-live="polite"
-        className="flex-1 overflow-y-auto p-4 font-mono text-[11px] leading-relaxed space-y-1.5 select-text selection:bg-[rgba(255,255,255,0.08)] selection:text-white"
+        className="flex-1 overflow-y-auto p-4 font-mono text-[11px] leading-relaxed space-y-1.5 select-text selection:bg-[rgba(255,255,255,0.08)] selection:text-white relative"
         style={{ backgroundColor: 'var(--bg-inset)' }}
       >
         {logs.length === 0 ? (
@@ -104,6 +124,21 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({ logs, clearLogs }) =
           })
         )}
         <div ref={bottomRef} />
+
+        {showJumpButton && (
+          <button
+            onClick={jumpToLatest}
+            className="absolute bottom-4 right-4 px-3 py-1.5 text-xs font-semibold rounded shadow-lg transition-all duration-150 flex items-center space-x-1"
+            style={{
+              backgroundColor: 'var(--bg-elevated)',
+              border: '1px solid var(--border-default)',
+              color: 'var(--accent)',
+              zIndex: 10,
+            }}
+          >
+            <span>↓ Jump to latest</span>
+          </button>
+        )}
       </div>
     </div>
   );

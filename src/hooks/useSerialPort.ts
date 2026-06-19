@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { getFormattedTime } from '../utils/time';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'error';
 
@@ -33,16 +34,9 @@ export const useSerialPort = () => {
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
   const retryCountRef = useRef<number>(0);
   const isReadingRef = useRef<boolean>(false);
+  const pauseCountRef = useRef<number>(0);
 
-  // Helper: Get formatted HH:MM:SS.mmm timestamp
-  const getFormattedTime = (): string => {
-    const now = new Date();
-    const hh = now.getHours().toString().padStart(2, '0');
-    const mm = now.getMinutes().toString().padStart(2, '0');
-    const ss = now.getSeconds().toString().padStart(2, '0');
-    const mss = now.getMilliseconds().toString().padStart(3, '0');
-    return `${hh}:${mm}:${ss}.${mss}`;
-  };
+
 
   // Helper: Append a new log line
   const appendLog = useCallback((level: TerminalLog['level'], message: string) => {
@@ -68,6 +62,7 @@ export const useSerialPort = () => {
   // Cleanup references, locks, and closes the port
   const cleanupPort = useCallback(async () => {
     isReadingRef.current = false;
+    pauseCountRef.current = 0;
     
     if (readerRef.current) {
       try {
@@ -197,7 +192,7 @@ export const useSerialPort = () => {
 
     setConnectionStatus('connecting');
     setErrorMsg(null);
-    const displayBaud = selectedBaud === 0 ? '0 (USB CDC)' : selectedBaud;
+    const displayBaud = selectedBaud === 0 ? 'USB CDC' : selectedBaud + ' bps';
     appendLog('INFO', `Initiating connection (Arch: ${selectedArch.toUpperCase()}, Baud: ${displayBaud})...`);
 
     let port: SerialPort | null = null;
@@ -264,6 +259,10 @@ export const useSerialPort = () => {
 
   // Temporarily suspends the background serial reader loop
   const pauseReadLoop = useCallback(async () => {
+    pauseCountRef.current++;
+    if (pauseCountRef.current > 1) {
+      console.warn(`[SerialPort] pauseReadLoop called when already paused, count: ${pauseCountRef.current}`);
+    }
     isReadingRef.current = false;
     if (readerRef.current) {
       try {
@@ -282,8 +281,13 @@ export const useSerialPort = () => {
 
   // Resumes the background serial reader loop
   const resumeReadLoop = useCallback(() => {
-    if (portRef.current && portRef.current.readable) {
-      startReadLoop(portRef.current);
+    if (pauseCountRef.current > 0) {
+      pauseCountRef.current--;
+    }
+    if (pauseCountRef.current === 0) {
+      if (portRef.current && portRef.current.readable) {
+        startReadLoop(portRef.current);
+      }
     }
   }, [startReadLoop]);
 

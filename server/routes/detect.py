@@ -33,7 +33,7 @@ async def detect_mcu_runtime(req: DetectRequest):
         # Decode base64 bytes
         if req.port_data:
             decoded_bytes = base64.b64decode(req.port_data)
-            decoded_text = decoded_bytes.decode("utf-8", errors="replace")
+            decoded_text = decoded_bytes.decode("latin-1")
         else:
             decoded_text = ""
     except Exception as e:

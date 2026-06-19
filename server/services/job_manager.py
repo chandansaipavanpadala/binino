@@ -24,7 +24,7 @@ class JobRecord:
     result: Optional[dict] = None
     error: Optional[str] = None
     created_at: datetime = None
-    completion_event: asyncio.Event = field(default_factory=asyncio.Event)
+    completion_event: Optional[asyncio.Event] = None
 
     def __post_init__(self):
         if self.created_at is None:
@@ -45,13 +45,20 @@ class JobManager:
         clean_id = "".join(c for c in job_id if c.isalnum())
         return self.base_dir / clean_id
 
-    def create_job(self, job_id: str, filename: str, arch: str, flash_size: int, flash_base: int) -> JobRecord:
+    def create_job(self, job_id: str, filename: str, arch: str, flash_size: int, flash_base: int, completion_event: asyncio.Event = None) -> JobRecord:
         """Allocates directory space and registers a new job record."""
         job_dir = self.get_job_dir(job_id)
         job_dir.mkdir(parents=True, exist_ok=True)
         
         filepath = job_dir / filename
         
+        # If no event passed, try creating one in current loop
+        if completion_event is None:
+            try:
+                completion_event = asyncio.Event()
+            except RuntimeError:
+                pass
+
         record = JobRecord(
             job_id=job_id,
             filename=filename,
@@ -60,7 +67,8 @@ class JobManager:
             flash_size=flash_size,
             flash_base=flash_base,
             status="queued",
-            percent=0
+            percent=0,
+            completion_event=completion_event
         )
         self.jobs[job_id] = record
         logger.info(f"Registered job {job_id} for {filename} ({arch})")

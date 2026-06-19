@@ -246,13 +246,25 @@ export const useFlashExtractor = ({
   const enterBootloaderMode = async (port: SerialPort): Promise<void> => {
     appendLog('INFO', 'Entering bootloader mode...');
     // cycle signals (Assert dataTerminalReady, pulse requestToSend EN pin)
-    await port.setSignals({ dataTerminalReady: true, requestToSend: true });
+    try {
+      await port.setSignals({ dataTerminalReady: true, requestToSend: true });
+    } catch (e: any) {
+      appendLog('WARN', `[Bootloader] Failed to set DTR/RTS signals: ${e.message || e}. If device fails to sync, press BOOT/BOOT0/RESET manually.`);
+    }
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    await port.setSignals({ dataTerminalReady: true, requestToSend: false });
+    try {
+      await port.setSignals({ dataTerminalReady: true, requestToSend: false });
+    } catch (e: any) {
+      console.warn('Failed to set DTR/RTS signals (2):', e);
+    }
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+    try {
+      await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+    } catch (e: any) {
+      console.warn('Failed to set DTR/RTS signals (3):', e);
+    }
     await new Promise((resolve) => setTimeout(resolve, 100));
   };
 

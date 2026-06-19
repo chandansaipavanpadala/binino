@@ -75,8 +75,9 @@ async def upload_firmware(
     filename = sanitize_filename(file.filename)
     job_id = uuid.uuid4().hex
     
-    # Create the job record in manager
-    record = job_manager.create_job(job_id, filename, arch, flash_size, mcu_profile.flash_base)
+    # Create the job record in manager (creating Event inside running event loop)
+    event = asyncio.Event()
+    record = job_manager.create_job(job_id, filename, arch, flash_size, mcu_profile.flash_base, completion_event=event)
     
     # 3. Read stream in chunks and enforce size check in case content-length was missing/faked
     total_bytes = 0

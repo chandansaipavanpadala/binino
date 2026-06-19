@@ -46,7 +46,11 @@ class GhidraRunner:
 
         mcu_profile = MCU_REGISTRY[arch]
         processor = mcu_profile.ghidra_lang
-        flash_base = mcu_profile.flash_base
+        
+        # Retrieve flash_base from JobRecord as required by BUG-019
+        from server.services.job_manager import job_manager
+        record = job_manager.get_job(job_id)
+        flash_base = record.flash_base if record else mcu_profile.flash_base
 
         # 1. Fallback to simulation if Ghidra is missing
         if not self.is_ghidra_available():

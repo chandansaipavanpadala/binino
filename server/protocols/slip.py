@@ -133,12 +133,68 @@ def read_flash(port: str, mcu_profile, flash_size: int, progress_callback: Calla
         chip = chip_detect(ser)
         logger.info(f"Detected Espressif target chip: {chip}")
         
+        def read_flash_range(start_addr: int, length: int) -> bytes:
+            buf = bytearray()
+            block_size = 1024
+            for offset in range(start_addr, start_addr + length, block_size):
+                read_cmd = bytearray(8)
+                read_cmd[0] = 0x00
+                read_cmd[1] = 0x03
+                read_cmd[2:4] = (16).to_bytes(2, 'little')
+                
+                variables = bytearray(16)
+                variables[0:4] = offset.to_bytes(4, 'little')
+                variables[4:8] = block_size.to_bytes(4, 'little')
+                variables[8:12] = (0).to_bytes(4, 'little')
+                variables[12:16] = (0).to_bytes(4, 'little')
+                
+                packet = slip_frame(read_cmd + variables)
+                ser.write(packet)
+                
+                success = False
+                for retry in range(3):
+                    time.sleep(0.01)
+                    block_resp_raw = ser.read(block_size + 32)
+                    if block_resp_raw:
+                        block_resp = slip_unframe(block_resp_raw)
+                        if len(block_resp) >= 8 + block_size:
+                            payload = block_resp[8:8+block_size]
+                            buf.extend(payload)
+                            success = True
+                            break
+                if not success:
+                    buf.extend(b'\x00' * block_size)
+            return bytes(buf)
+
         app_offset = 0
         if "c3" in chip or "c6" in chip or "h2" in chip:
             # RISC-V variants: Read partition table at 0x8000
             logger.info("Reading RISC-V target partition table at 0x8000...")
-            # For simplicity, we assume app partition offset is offset 0x10000
-            app_offset = 0x10000
+            part_table_bytes = read_flash_range(0x8000, 4096)
+            
+            parsed_offset = None
+            parsed_size = None
+            for i in range(0, len(part_table_bytes), 32):
+                entry = part_table_bytes[i:i+32]
+                if len(entry) < 32:
+                    break
+                if entry[0] == 0xAA and entry[1] == 0x50:
+                    part_type = entry[2]
+                    part_subtype = entry[3]
+                    part_offset = int.from_bytes(entry[4:8], 'little')
+                    part_size = int.from_bytes(entry[8:12], 'little')
+                    if part_type == 0x00 and part_subtype == 0x10:
+                        parsed_offset = part_offset
+                        parsed_size = part_size
+                        break
+            
+            if parsed_offset is not None:
+                logger.info(f"Found factory app partition at offset {hex(parsed_offset)} with size {parsed_size} bytes")
+                app_offset = parsed_offset
+                flash_size = min(flash_size, parsed_size)
+            else:
+                logger.warning("Could not find factory app partition (0x00, 0x10) in partition table, defaulting to 0x10000")
+                app_offset = 0x10000
             
         # Read flash blocks
         data = bytearray()

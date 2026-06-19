@@ -278,7 +278,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
                 }}
               >
                 {selectedMcu?.default_baud === 0 ? (
-                  <option value="0">N/A (USB-only)</option>
+                  <option value="0">USB CDC (auto)</option>
                 ) : (
                   <>
                     <option value="1200">1200 bps</option>

@@ -30,7 +30,7 @@ export const Navbar: React.FC = () => {
           className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded-full bg-[#1A1A1A] text-[#888888]"
           style={{ border: '1px solid var(--border-subtle)' }}
         >
-          v2.0.0
+          v2.0.4
         </span>
       </div>
 

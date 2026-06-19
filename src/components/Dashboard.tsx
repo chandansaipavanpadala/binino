@@ -12,6 +12,7 @@ import { CodeExplorer } from './CodeExplorer';
 import { ErrorBoundary } from './CodeExplorer/ErrorBoundary';
 import { AlertTriangle, AlertCircle } from 'lucide-react';
 import { FileBrowser } from './FileBrowser';
+import { FileBrowserErrorBoundary } from './FileBrowser/FileBrowserErrorBoundary';
 import { RuntimeBadge } from './FileBrowser/RuntimeBadge';
 
 export const Dashboard: React.FC = () => {
@@ -206,7 +207,9 @@ export const Dashboard: React.FC = () => {
           {/* Right Column: Terminal Stream (65%) & Hex Dump (35%) OR File Browser OR Terminal-Only */}
           {showFileBrowser ? (
             <section className="lg:col-span-7 flex flex-col min-h-0 overflow-hidden">
-              <FileBrowser />
+              <FileBrowserErrorBoundary>
+                <FileBrowser />
+              </FileBrowserErrorBoundary>
             </section>
           ) : showTerminalOnly || showInfoOnly ? (
             <section className="lg:col-span-7 flex flex-col space-y-4 min-h-0 overflow-hidden">

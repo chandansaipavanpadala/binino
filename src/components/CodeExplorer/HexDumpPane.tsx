@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { AnalysisResult, FunctionRecord } from '../../types/analysis';
+import { MCU_REGISTRY } from '../../utils/mcuRegistry';
 
 interface HexDumpPaneProps {
   result: AnalysisResult;
@@ -18,6 +19,11 @@ export const HexDumpPane: React.FC<HexDumpPaneProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [containerHeight, setContainerHeight] = useState(400);
+
+  const mcuProfile = useMemo(() => {
+    const archKey = result.arch?.toLowerCase() || '';
+    return MCU_REGISTRY[archKey] || null;
+  }, [result.arch]);
 
   // Address Jump Input States
   const [jumpInput, setJumpInput] = useState('');
@@ -77,22 +83,39 @@ export const HexDumpPane: React.FC<HexDumpPaneProps> = ({
   const bufferLength = activeBuffer.length;
   const totalRows = Math.ceil(bufferLength / 16);
 
-  // PERF: row height is fixed at 22px.
-  const ROW_HEIGHT = 22;
+  // PERF: row height is measured dynamically to prevent token scale drift.
+  const [rowHeight, setRowHeight] = useState(22);
+  const rowRef = useRef<HTMLDivElement>(null);
   const OVERSCAN = 10;
-  const totalHeight = totalRows * ROW_HEIGHT;
+  const totalHeight = totalRows * rowHeight;
 
-  // Monitor element height to size virtual viewport
+  // Monitor element height to size virtual viewport and measure row height
   useEffect(() => {
     if (!containerRef.current) return;
     const observer = new ResizeObserver((entries) => {
       for (let entry of entries) {
         setContainerHeight(entry.contentRect.height);
       }
+      if (rowRef.current) {
+        const height = rowRef.current.getBoundingClientRect().height;
+        if (height > 0) {
+          setRowHeight(height);
+        }
+      }
     });
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, []);
+
+  // Measure row height on layout changes
+  useEffect(() => {
+    if (rowRef.current) {
+      const height = rowRef.current.getBoundingClientRect().height;
+      if (height > 0 && height !== rowHeight) {
+        setRowHeight(height);
+      }
+    }
+  }, [rowHeight]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     setScrollTop(e.currentTarget.scrollTop);
@@ -111,16 +134,23 @@ export const HexDumpPane: React.FC<HexDumpPaneProps> = ({
     if (val >= baseAddr && val < baseAddr + bufferLength) {
       return val - baseAddr;
     }
-    // If they typed a raw offset
-    if (val >= 0 && val < bufferLength) {
-      return val;
+
+    // Subtract MCUProfile.flash_base from entered address
+    const flashBase = mcuProfile ? mcuProfile.flash_base : 0;
+    const offset = val - flashBase;
+
+    if (offset < 0) {
+      throw new Error('Address is negative relative to MCU flash base.');
+    }
+    if (offset < bufferLength) {
+      return offset;
     }
     throw new Error('Address out of bounds.');
   };
 
   const scrollToOffset = (offset: number) => {
     const row = Math.floor(offset / 16);
-    const targetScrollTop = row * ROW_HEIGHT;
+    const targetScrollTop = row * rowHeight;
     if (containerRef.current) {
       // Center the target row slightly
       const viewportHeight = containerRef.current.clientHeight;
@@ -206,8 +236,8 @@ export const HexDumpPane: React.FC<HexDumpPaneProps> = ({
 
   // Compile slice of visible rows for custom virtual scrolling
   const visibleRows = useMemo(() => {
-    const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
-    const endIndex = Math.min(totalRows, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + OVERSCAN);
+    const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - OVERSCAN);
+    const endIndex = Math.min(totalRows, Math.ceil((scrollTop + containerHeight) / rowHeight) + OVERSCAN);
 
     const rows = [];
     for (let r = startIndex; r < endIndex; r++) {
@@ -217,12 +247,12 @@ export const HexDumpPane: React.FC<HexDumpPaneProps> = ({
         index: r,
         offset: startOffset,
         bytes: rowBytes,
-        top: r * ROW_HEIGHT,
+        top: r * rowHeight,
         isHighlighted: isRowInFunctionRange(r),
       });
     }
     return rows;
-  }, [scrollTop, containerHeight, activeBuffer, funcBounds, totalRows]);
+  }, [scrollTop, containerHeight, activeBuffer, funcBounds, totalRows, rowHeight]);
 
   if (!isDemoMode && !flashBuffer) {
     return (
@@ -333,15 +363,17 @@ export const HexDumpPane: React.FC<HexDumpPaneProps> = ({
         )}
 
         <div className="relative w-full" style={{ height: `${totalHeight}px` }}>
-          {visibleRows.map((row) => {
+          {visibleRows.map((row, idx) => {
             const rowAddrHex = (baseAddr + row.offset).toString(16).toUpperCase().padStart(8, '0');
             
             return (
               <div
                 key={row.offset}
+                ref={idx === 0 ? rowRef : undefined}
                 className="absolute left-0 right-0 h-[22px] flex items-center px-4 hover:bg-[#1A1A1A] border-l-2 transition-colors"
                 style={{ 
                   top: `${row.top}px`,
+                  height: `${rowHeight}px`,
                   borderLeftColor: row.isHighlighted ? 'var(--accent)' : 'transparent',
                   backgroundColor: row.isHighlighted ? 'rgba(255, 255, 255, 0.02)' : 'transparent'
                 }}
