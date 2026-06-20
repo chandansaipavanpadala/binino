@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { MCU_REGISTRY } from '../utils/mcuRegistry';
+import { getBackendUrl } from '../utils/backend';
 
 export type DetectStatus = 'idle' | 'probing' | 'detected' | 'error';
 export type Confidence = 'high' | 'medium' | 'low';
@@ -369,8 +370,8 @@ export const useSmartDetect = () => {
       }
       const base64Data = window.btoa(asciiStr);
 
-      const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
-      const response = await fetch(`http://${host}:8000/api/detect`, {
+      const backendUrl = getBackendUrl();
+      const response = await fetch(`${backendUrl}/api/detect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

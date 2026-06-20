@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { Cpu, Github, HelpCircle } from 'lucide-react';
 import { APP_VERSION } from '../utils/version';
+import { getBackendUrl } from '../utils/backend';
 
 export const Navbar: React.FC = () => {
   const navigate = useNavigate();
@@ -15,8 +16,8 @@ export const Navbar: React.FC = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000);
       try {
-        const host = window.location.hostname || 'localhost';
-        const res = await fetch(`http://${host}:8000/`, { 
+        const backendUrl = getBackendUrl();
+        const res = await fetch(`${backendUrl}/`, { 
           method: 'GET',
           signal: controller.signal
         });
@@ -75,13 +76,26 @@ export const Navbar: React.FC = () => {
       <div className="flex items-center space-x-3">
         {/* Server Status Indicator */}
         <div 
-          className="flex items-center space-x-1.5 px-2.5 py-1 text-[11px] font-medium rounded border select-none transition-all duration-150"
+          className="flex items-center space-x-1.5 px-2.5 py-1 text-[11px] font-medium rounded border select-none transition-all duration-150 cursor-pointer hover:opacity-85 active:scale-95"
           style={{
             borderColor: serverOnline ? 'rgba(74, 222, 128, 0.2)' : 'rgba(248, 113, 113, 0.2)',
             backgroundColor: serverOnline ? 'rgba(74, 222, 128, 0.04)' : 'rgba(248, 113, 113, 0.04)',
             color: serverOnline ? 'var(--status-live)' : 'var(--status-error)',
           }}
-          title={serverOnline ? "Backend Decompiler Server is active" : "Backend Decompiler Server is unreachable"}
+          title={serverOnline ? "Backend Decompiler Server is active. Click to configure IP." : "Backend Decompiler Server is unreachable. Click to configure IP."}
+          onClick={() => {
+            const currentUrl = localStorage.getItem('binino_backend_url') || 'http://localhost:8000';
+            const newUrl = prompt('Enter your Backend Server URL:', currentUrl);
+            if (newUrl !== null) {
+              const trimmed = newUrl.trim();
+              if (trimmed) {
+                localStorage.setItem('binino_backend_url', trimmed);
+              } else {
+                localStorage.removeItem('binino_backend_url');
+              }
+              window.location.reload();
+            }
+          }}
         >
           <span 
             className="w-1.5 h-1.5 rounded-full" 

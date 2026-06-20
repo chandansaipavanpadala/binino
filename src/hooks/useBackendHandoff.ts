@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { AnalysisResult } from '../types/analysis';
+import { getBackendUrl } from '../utils/backend';
 
 export type UploadStatus = 'idle' | 'uploading' | 'queued' | 'analyzing' | 'done' | 'error';
 
@@ -95,8 +96,8 @@ export const useBackendHandoff = ({
     }
 
     appendLog('INFO', `Connecting to progress event stream for job: ${targetJobId}...`);
-    const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
-    const sseUrl = `http://${host}:8000/api/analyze/${targetJobId}`;
+    const backendUrl = getBackendUrl();
+    const sseUrl = `${backendUrl}/api/analyze/${targetJobId}`;
     const es = new EventSource(sseUrl);
     eventSourceRef.current = es;
 
@@ -154,9 +155,9 @@ export const useBackendHandoff = ({
       // Avoid overwrite error state if closed successfully
       setUploadStatus((prev) => {
         if (prev === 'done' || prev === 'error') return prev;
-        const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
-        appendLog('ERROR', `Cannot connect to Binino server on ${host}:8000. Run: python -m uvicorn server.main:app --port 8000`);
-        setErrorMessage(`Cannot connect to Binino server on ${host}:8000.`);
+        const backendUrl = getBackendUrl();
+        appendLog('ERROR', `Cannot connect to Binino server on ${backendUrl}. Run: python -m uvicorn server.main:app --port 8000`);
+        setErrorMessage(`Cannot connect to Binino server on ${backendUrl}.`);
         return 'error';
       });
       es.close();
@@ -563,10 +564,10 @@ app_main:
 
     // Handle network disruptions
     xhr.onerror = () => {
-      const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
+      const backendUrl = getBackendUrl();
       setUploadStatus('error');
-      setErrorMessage(`Network error occurred. Ensure Python FastAPI server is active on port 8000.`);
-      appendLog('ERROR', `Failed to reach decompiler server at http://${host}:8000. Server offline?`);
+      setErrorMessage(`Network error occurred. Ensure Python FastAPI server is active.`);
+      appendLog('ERROR', `Failed to reach decompiler server at ${backendUrl}. Server offline?`);
       xhrRef.current = null;
     };
 
@@ -577,8 +578,8 @@ app_main:
     formData.append('arch', selectedArch);
     formData.append('flash_size', flashBuffer.length.toString());
 
-    const dynamicHost = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
-    xhr.open('POST', `http://${dynamicHost}:8000/api/upload`);
+    const backendUrl = getBackendUrl();
+    xhr.open('POST', `${backendUrl}/api/upload`);
     xhr.send(formData);
 
   }, [flashBuffer, extractionStatus, selectedArch, appendLog, isDemoMode, connectSSE, resetHandoff]);

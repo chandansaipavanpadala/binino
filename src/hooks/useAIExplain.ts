@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { AnalysisResult } from '../types/analysis';
+import { getBackendUrl } from '../utils/backend';
 
 export type ExplainStatus = 'idle' | 'loading' | 'streaming' | 'done' | 'error';
 
@@ -139,8 +140,8 @@ export const useAIExplain = (isDemoMode: boolean) => {
     }
 
     try {
-      const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
-      const response = await fetch(`http://${host}:8000/api/explain`, {
+      const backendUrl = getBackendUrl();
+      const response = await fetch(`${backendUrl}/api/explain`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

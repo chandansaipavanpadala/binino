@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Copy, Download, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
 import { FileNode } from './FileTree';
+import { getBackendUrl } from '../../utils/backend';
 
 interface FileViewerProps {
   file: FileNode | null;
@@ -127,8 +128,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({
     setErrorMessage(null);
 
     try {
-      const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
-      const response = await fetch(`http://${host}:8000/api/explain-source`, {
+      const backendUrl = getBackendUrl();
+      const response = await fetch(`${backendUrl}/api/explain-source`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

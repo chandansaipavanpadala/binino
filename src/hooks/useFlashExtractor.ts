@@ -337,7 +337,7 @@ export const useFlashExtractor = ({
         
         // Validate XOR Checksum
         const computed = computeXorChecksum(body);
-        if (computed !== value) {
+        if (computed !== (value & 0xFF)) {
           throw new Error('XOR Checksum Mismatch');
         }
 

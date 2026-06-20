@@ -5,6 +5,7 @@ import { ExtractionPanel } from './ExtractionPanel';
 import { RefreshCw, Play, Square, AlertTriangle } from 'lucide-react';
 import { MCU_REGISTRY, MCUProfile } from '../utils/mcuRegistry';
 import { useAppContext } from '../context/AppContext';
+import { getBackendUrl } from '../utils/backend';
 
 interface ConnectionPanelProps {
   connectionStatus: ConnectionStatus;
@@ -65,8 +66,8 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
 
   // Fetch MCU registry dynamically from backend, fall back to local import on error
   useEffect(() => {
-    const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
-    fetch(`http://${host}:8000/api/mcu/list`)
+    const backendUrl = getBackendUrl();
+    fetch(`${backendUrl}/api/mcu/list`)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch MCU list');
         return res.json();
