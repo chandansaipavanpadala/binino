@@ -168,7 +168,7 @@ export const Dashboard: React.FC = () => {
               <div className="rounded-lg p-5 flex flex-col bg-[#111111] space-y-3" style={{ border: '1px solid var(--border-subtle)' }}>
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-mono tracking-wider uppercase text-[var(--text-secondary)]">Active Environment</span>
-                  <RuntimeBadge runtime={detectedRuntime} />
+                  <RuntimeBadge runtime={detectedRuntime || 'compiled'} />
                 </div>
                 <p className="text-[11px] text-[#888888] leading-relaxed">
                   This microcontroller runs an interpreted environment. Plain-text script files can be directly browsed, analyzed, and modified without binary extraction.
@@ -211,11 +211,25 @@ export const Dashboard: React.FC = () => {
                 <FileBrowser />
               </FileBrowserErrorBoundary>
             </section>
+          ) : connectionStatus === 'idle' ? (
+            <section className="lg:col-span-7 flex flex-col items-center justify-center p-8 bg-[#111111] rounded-lg border border-[var(--border-subtle)] text-center space-y-4 select-none min-h-[300px]">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[#222222] border border-[var(--border-subtle)] text-[var(--accent)]">
+                <svg className="w-6 h-6 animate-pulse" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                </svg>
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Connect a device to get started</h3>
+                <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
+                  Select your microcontroller architecture and baud rate on the left, then click Establish Bridge to connect your device.
+                </p>
+              </div>
+            </section>
           ) : showTerminalOnly || showInfoOnly ? (
             <section className="lg:col-span-7 flex flex-col space-y-4 min-h-0 overflow-hidden">
               <div className="bg-[#111111] border border-[var(--border-subtle)] rounded-lg p-5 shrink-0">
                 <h3 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>
-                  {detectedRuntime === 'at-firmware' ? 'AT Command Mode' : `${detectedRuntime.toUpperCase()} Shell Mode`}
+                  {detectedRuntime === 'at-firmware' ? 'AT Command Mode' : `${detectedRuntime?.toUpperCase() || ''} Shell Mode`}
                 </h3>
                 <p className="text-[11px] text-[#A0A0A0] leading-relaxed">
                   {detectionMessage || 'Interactive console mode. Use the terminal below to interface with the device runtime.'}
@@ -255,7 +269,6 @@ export const Dashboard: React.FC = () => {
             result={result}
             flashBuffer={flashBuffer}
             onClose={() => setIsExplorerOpen(false)}
-            isDemoMode={isDemoMode}
           />
         </ErrorBoundary>
       )}

@@ -139,7 +139,8 @@ export const useAIExplain = (isDemoMode: boolean) => {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/api/explain', {
+      const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
+      const response = await fetch(`http://${host}:8000/api/explain`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

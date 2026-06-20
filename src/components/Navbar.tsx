@@ -1,11 +1,42 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { Cpu, Github, HelpCircle } from 'lucide-react';
+import { APP_VERSION } from '../utils/version';
 
 export const Navbar: React.FC = () => {
   const navigate = useNavigate();
-  const { isDemoMode, setIsDemoMode } = useAppContext();
+  const { isDemoMode, setIsDemoMode, connectionStatus, extractionStatus } = useAppContext();
+
+  const [serverOnline, setServerOnline] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkServer = async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      try {
+        const host = window.location.hostname || 'localhost';
+        const res = await fetch(`http://${host}:8000/`, { 
+          method: 'GET',
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        setServerOnline(res.ok);
+      } catch (_) {
+        clearTimeout(timeoutId);
+        setServerOnline(false);
+      }
+    };
+
+    checkServer();
+    const interval = setInterval(checkServer, 5000); // Check every 5s
+    return () => clearInterval(interval);
+  }, []);
+
+  const isDisableToggle = (!isDemoMode && connectionStatus === 'connected') || extractionStatus === 'reading';
+  const tooltipText = isDisableToggle
+    ? "Disconnect device before switching to Demo Mode."
+    : "Toggle Hardware Simulation Mode";
 
   return (
     <header
@@ -36,22 +67,47 @@ export const Navbar: React.FC = () => {
           className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded-full bg-[#1A1A1A] text-[#888888]"
           style={{ border: '1px solid var(--border-subtle)' }}
         >
-          v2.0.5
+          v{APP_VERSION}
         </span>
       </div>
 
       {/* Right: Controls & Navigation */}
       <div className="flex items-center space-x-3">
+        {/* Server Status Indicator */}
+        <div 
+          className="flex items-center space-x-1.5 px-2.5 py-1 text-[11px] font-medium rounded border select-none transition-all duration-150"
+          style={{
+            borderColor: serverOnline ? 'rgba(74, 222, 128, 0.2)' : 'rgba(248, 113, 113, 0.2)',
+            backgroundColor: serverOnline ? 'rgba(74, 222, 128, 0.04)' : 'rgba(248, 113, 113, 0.04)',
+            color: serverOnline ? 'var(--status-live)' : 'var(--status-error)',
+          }}
+          title={serverOnline ? "Backend Decompiler Server is active" : "Backend Decompiler Server is unreachable"}
+        >
+          <span 
+            className="w-1.5 h-1.5 rounded-full" 
+            style={{ 
+              backgroundColor: serverOnline ? 'var(--status-live)' : 'var(--status-error)',
+              boxShadow: serverOnline ? '0 0 4px var(--status-live)' : 'none'
+            }}
+          />
+          <span>{serverOnline ? 'Server Online' : 'Server Offline'}</span>
+        </div>
+
         {/* Demo Mode Toggle */}
         <button
-          onClick={() => setIsDemoMode(!isDemoMode)}
-          className="flex items-center space-x-1.5 px-2.5 py-1 text-[11px] font-medium rounded transition-all duration-150"
+          onClick={() => {
+            if (!isDisableToggle) {
+              setIsDemoMode(!isDemoMode);
+            }
+          }}
+          disabled={isDisableToggle}
+          className="flex items-center space-x-1.5 px-2.5 py-1 text-[11px] font-medium rounded transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             backgroundColor: isDemoMode ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
             border: `1px solid ${isDemoMode ? 'var(--accent)' : 'var(--border-subtle)'}`,
             color: isDemoMode ? 'var(--text-primary)' : 'var(--text-secondary)',
           }}
-          title="Toggle Hardware Simulation Mode"
+          title={tooltipText}
         >
           <span
             className="w-1.5 h-1.5 rounded-full"

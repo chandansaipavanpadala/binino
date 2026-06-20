@@ -60,12 +60,13 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   const isConnected = connectionStatus === 'connected';
   const isConnecting = connectionStatus === 'connecting';
 
-  const { detectStatus, detectionMessage } = useAppContext();
+  const { detectStatus, detectionMessage, resetAllPipelineState, appendLog } = useAppContext();
   const [mcuList, setMcuList] = useState<Record<string, MCUProfile>>(MCU_REGISTRY);
 
   // Fetch MCU registry dynamically from backend, fall back to local import on error
   useEffect(() => {
-    fetch('http://localhost:8000/api/mcu/list')
+    const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
+    fetch(`http://${host}:8000/api/mcu/list`)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch MCU list');
         return res.json();
@@ -100,6 +101,10 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
     const mcu = mcuList[arch];
     if (mcu) {
       setSelectedBaud(mcu.default_baud);
+    }
+    if (connectionStatus === 'connected') {
+      resetAllPipelineState();
+      appendLog('WARN', '[WARN] Architecture changed — previous extraction data cleared.');
     }
   };
   
@@ -201,7 +206,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
                 id="arch-select"
                 value={selectedArch}
                 onChange={(e) => handleArchChange(e.target.value)}
-                disabled={isConnected || isConnecting}
+                disabled={(!isDemoMode && isConnected) || isConnecting || extractionStatus === 'reading'}
                 className="w-full h-9 px-3 py-1.5 rounded text-xs font-sans text-[#F0F0F0] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 focus:outline-none"
                 style={{
                   backgroundColor: 'var(--bg-inset)',
@@ -338,24 +343,26 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
       </div>
 
       {/* Extraction Section (Phase 2) */}
-      <ExtractionPanel
-        connectionStatus={connectionStatus}
-        selectedArch={selectedArch}
-        isDemoMode={isDemoMode}
-        extractionStatus={extractionStatus}
-        bytesRead={bytesRead}
-        totalBytes={totalBytes}
-        progressPercent={progressPercent}
-        downloadBin={downloadBin}
-        cancelExtraction={cancelExtraction}
-        startExtraction={startExtraction}
-        flashBuffer={flashBuffer}
-        isBrowserSupported={isBrowserSupported}
-        isExpanded={isExtractorExpanded}
-        onToggle={onToggleExtractor}
-        flashSizes={selectedMcu?.flash_sizes}
-        defaultFlashSize={selectedMcu?.default_flash_size}
-      />
+      {connectionStatus === 'connected' && (
+        <ExtractionPanel
+          connectionStatus={connectionStatus}
+          selectedArch={selectedArch}
+          isDemoMode={isDemoMode}
+          extractionStatus={extractionStatus}
+          bytesRead={bytesRead}
+          totalBytes={totalBytes}
+          progressPercent={progressPercent}
+          downloadBin={downloadBin}
+          cancelExtraction={cancelExtraction}
+          startExtraction={startExtraction}
+          flashBuffer={flashBuffer}
+          isBrowserSupported={isBrowserSupported}
+          isExpanded={isExtractorExpanded}
+          onToggle={onToggleExtractor}
+          flashSizes={selectedMcu?.flash_sizes}
+          defaultFlashSize={selectedMcu?.default_flash_size}
+        />
+      )}
     </div>
   );
 };

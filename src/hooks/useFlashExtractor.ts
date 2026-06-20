@@ -214,26 +214,33 @@ export const useFlashExtractor = ({
     // Await response packet
     const reader = port.readable.getReader();
     try {
-      const responseDecoded = await readSlipPacket(reader, timeoutMs);
-      
-      if (responseDecoded.length < 8) {
-        throw new Error('Response packet header too short');
-      }
+      const startTime = Date.now();
+      while (true) {
+        const elapsedTime = Date.now() - startTime;
+        const remainingTimeout = Math.max(100, timeoutMs - elapsedTime);
+        const responseDecoded = await readSlipPacket(reader, remainingTimeout);
+        
+        if (responseDecoded.length < 8) {
+          throw new Error('Response packet header too short');
+        }
 
-      const respDirection = responseDecoded[0];
-      const respOpcode = responseDecoded[1];
-      const respSize = responseDecoded[2] | (responseDecoded[3] << 8);
-      const respValue = responseDecoded[4] | (responseDecoded[5] << 8) | (responseDecoded[6] << 16) | (responseDecoded[7] << 24);
-      const respBody = responseDecoded.slice(8, 8 + respSize);
+        const respDirection = responseDecoded[0];
+        const respOpcode = responseDecoded[1];
+        const respSize = responseDecoded[2] | (responseDecoded[3] << 8);
+        const respValue = responseDecoded[4] | (responseDecoded[5] << 8) | (responseDecoded[6] << 16) | (responseDecoded[7] << 24);
+        const respBody = responseDecoded.slice(8, 8 + respSize);
 
-      if (respDirection !== 0x01) {
-        throw new Error(`Invalid direction: expected 0x01, got 0x${respDirection.toString(16)}`);
-      }
-      if (respOpcode !== opcode) {
-        throw new Error(`Opcode mismatch: expected 0x${opcode.toString(16)}, got 0x${respOpcode.toString(16)}`);
-      }
+        if (respDirection !== 0x01) {
+          console.warn(`[Protocol] Ignored packet with invalid direction: 0x${respDirection.toString(16)}`);
+          continue;
+        }
+        if (respOpcode !== opcode) {
+          console.warn(`[Protocol] Opcode mismatch: expected 0x${opcode.toString(16)}, got 0x${respOpcode.toString(16)}. Stale packet? Ignored.`);
+          continue;
+        }
 
-      return { value: respValue, body: respBody };
+        return { value: respValue, body: respBody };
+      }
     } finally {
       reader.releaseLock();
     }
@@ -534,6 +541,19 @@ export const useFlashExtractor = ({
     URL.revokeObjectURL(url);
   }, [flashBuffer, selectedArch]);
 
+  /**
+   * Resets all flash extractor state variables.
+   */
+  const resetExtraction = useCallback(() => {
+    setExtractionStatus('idle');
+    setBytesRead(0);
+    setTotalBytes(0);
+    setProgressPercent(0);
+    setFlashBuffer(null);
+    setErrorMessage(null);
+    abortRef.current = false;
+  }, []);
+
   return {
     extractionStatus,
     bytesRead,
@@ -544,5 +564,6 @@ export const useFlashExtractor = ({
     startExtraction,
     cancelExtraction,
     downloadBin,
+    resetExtraction,
   };
 };

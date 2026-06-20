@@ -3,7 +3,7 @@ import { MCU_REGISTRY } from '../utils/mcuRegistry';
 
 export type DetectStatus = 'idle' | 'probing' | 'detected' | 'error';
 export type Confidence = 'high' | 'medium' | 'low';
-export type RecommendedAction = 'file-browser' | 'extract' | 'terminal' | 'info-only';
+export type RecommendedAction = 'file-browser' | 'extract' | 'terminal' | 'info-only' | null;
 
 export interface FilesystemCommands {
   list: string;
@@ -12,21 +12,100 @@ export interface FilesystemCommands {
   space?: string;
 }
 
+export const DEMO_RUNTIME_MAP: Record<string, string> = {
+  // Espressif
+  "esp32": "compiled",
+  "esp32s2": "micropython",
+  "esp32s3": "circuitpython",
+  "esp32c3": "espruino",
+  "esp32c6": "nodemcu",
+  "esp32h2": "compiled",
+  "esp8266": "at-firmware",
+
+  // AVR
+  "atmega328p": "compiled",
+  "atmega2560": "compiled",
+  "atmega32u4": "compiled",
+  "attiny85": "compiled",
+  "attiny45": "compiled",
+  "atmega4809": "compiled",
+
+  // STM32
+  "stm32f1": "compiled",
+  "stm32f4": "micropython",
+  "stm32l0": "compiled",
+  "stm32l4": "compiled",
+  "stm32g0": "compiled",
+  "stm32g4": "compiled",
+  "stm32h7": "compiled",
+  "gd32f1": "compiled",
+
+  // RP
+  "rp2040": "circuitpython",
+  "rp2350": "micropython",
+
+  // SAMD
+  "samd21": "circuitpython",
+  "samd51": "circuitpython",
+
+  // nRF
+  "nrf52840": "circuitpython",
+  "nrf52833": "compiled",
+  "nrf51822": "compiled",
+
+  // LPC (NXP)
+  "lpc1768": "compiled",
+  "lpc1114": "compiled",
+  "lpc54608": "compiled",
+
+  // i.MX (NXP)
+  "mimxrt1060": "compiled",
+
+  // MSP430 (TI)
+  "msp430g2": "compiled",
+  "msp430f5": "compiled",
+  "msp430fr5": "compiled",
+
+  // WCH
+  "ch32v003": "compiled",
+  "ch32v203": "compiled",
+  "ch552": "compiled",
+  "ch554": "compiled",
+
+  // PIC
+  "pic16f": "compiled",
+  "pic18f": "compiled",
+  "pic32mx": "compiled",
+
+  // Renesas
+  "rl78": "compiled",
+  "rx65n": "compiled",
+  "ra4m1": "compiled",
+
+  // Silicon Labs
+  "efm32gg": "compiled",
+  "efm32tg": "compiled",
+
+  // Infineon
+  "xmc1100": "compiled",
+  "xmc4700": "compiled"
+};
+
 export const useSmartDetect = () => {
   const [detectStatus, setDetectStatus] = useState<DetectStatus>('idle');
-  const [detectedRuntime, setDetectedRuntime] = useState<string>('compiled');
+  const [detectedRuntime, setDetectedRuntime] = useState<string | null>(null);
   const [runtimeVersion, setRuntimeVersion] = useState<string | null>(null);
   const [confidence, setConfidence] = useState<Confidence>('low');
-  const [recommendedAction, setRecommendedAction] = useState<RecommendedAction>('extract');
+  const [recommendedAction, setRecommendedAction] = useState<RecommendedAction>(null);
   const [detectionMessage, setDetectionMessage] = useState<string>('');
   const [filesystemCommands, setFilesystemCommands] = useState<FilesystemCommands | null>(null);
 
   const resetDetection = useCallback(() => {
     setDetectStatus('idle');
-    setDetectedRuntime('compiled');
+    setDetectedRuntime(null);
     setRuntimeVersion(null);
     setConfidence('low');
-    setRecommendedAction('extract');
+    setRecommendedAction(null);
     setDetectionMessage('');
     setFilesystemCommands(null);
   }, []);
@@ -37,10 +116,11 @@ export const useSmartDetect = () => {
     isDemoMode: boolean,
     appendLog: (level: 'INFO' | 'WARN' | 'ERROR' | 'DATA', msg: string) => void
   ) => {
+    // STATE-010: at start of runDetection(), set detectedRuntime=null and detectStatus='probing' before any probe
+    setDetectedRuntime(null);
     setDetectStatus('probing');
-    setDetectedRuntime('compiled');
     setConfidence('low');
-    setRecommendedAction('extract');
+    setRecommendedAction(null);
     setDetectionMessage('Initializing Smart Runtime Detector...');
     
     appendLog('INFO', '[SmartDetect] Probing serial interface for active runtime environments...');
@@ -75,8 +155,10 @@ export const useSmartDetect = () => {
       await new Promise(r => setTimeout(r, 1000));
       setDetectStatus('detected');
       
-      if (arch === 'esp32s2') {
-        setDetectedRuntime('micropython');
+      const runtime = DEMO_RUNTIME_MAP[arch] ?? 'compiled';
+      setDetectedRuntime(runtime);
+
+      if (runtime === 'micropython') {
         setRuntimeVersion('1.22.0');
         setConfidence('high');
         setRecommendedAction('file-browser');
@@ -92,8 +174,7 @@ export const useSmartDetect = () => {
           runtime: 'micropython',
           action: 'file-browser' as RecommendedAction
         };
-      } else if (arch === 'esp32s3') {
-        setDetectedRuntime('circuitpython');
+      } else if (runtime === 'circuitpython') {
         setRuntimeVersion('9.0.0');
         setConfidence('high');
         setRecommendedAction('file-browser');
@@ -109,8 +190,7 @@ export const useSmartDetect = () => {
           runtime: 'circuitpython',
           action: 'file-browser' as RecommendedAction
         };
-      } else if (arch === 'esp32c3') {
-        setDetectedRuntime('espruino');
+      } else if (runtime === 'espruino') {
         setRuntimeVersion('2v21');
         setConfidence('high');
         setRecommendedAction('file-browser');
@@ -125,8 +205,7 @@ export const useSmartDetect = () => {
           runtime: 'espruino',
           action: 'file-browser' as RecommendedAction
         };
-      } else if (arch === 'esp32c6') {
-        setDetectedRuntime('nodemcu');
+      } else if (runtime === 'nodemcu') {
         setRuntimeVersion('3.0.0');
         setConfidence('high');
         setRecommendedAction('file-browser');
@@ -141,8 +220,7 @@ export const useSmartDetect = () => {
           runtime: 'nodemcu',
           action: 'file-browser' as RecommendedAction
         };
-      } else if (arch === 'esp8266') {
-        setDetectedRuntime('at-firmware');
+      } else if (runtime === 'at-firmware') {
         setRuntimeVersion('1.7.4');
         setConfidence('high');
         setRecommendedAction('terminal');
@@ -154,9 +232,6 @@ export const useSmartDetect = () => {
           action: 'terminal' as RecommendedAction
         };
       } else {
-        // Default to compiled firmware for esp32 and other architectures.
-        // This ensures the Flash Extractor opens by default when entering Demo Mode.
-        setDetectedRuntime('compiled');
         setRuntimeVersion(null);
         setConfidence('low');
         setRecommendedAction('extract');
@@ -294,7 +369,8 @@ export const useSmartDetect = () => {
       }
       const base64Data = window.btoa(asciiStr);
 
-      const response = await fetch('http://localhost:8000/api/detect', {
+      const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
+      const response = await fetch(`http://${host}:8000/api/detect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

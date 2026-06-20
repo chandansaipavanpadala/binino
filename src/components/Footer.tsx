@@ -1,5 +1,6 @@
 import React from 'react';
 import { Github } from 'lucide-react';
+import { APP_VERSION } from '../utils/version';
 
 export const Footer: React.FC = () => {
   return (
@@ -22,7 +23,7 @@ export const Footer: React.FC = () => {
           className="px-1.5 py-0.5 rounded text-[9px] font-mono"
           style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}
         >
-          v2.0.5
+          v{APP_VERSION}
         </span>
       </div>
 

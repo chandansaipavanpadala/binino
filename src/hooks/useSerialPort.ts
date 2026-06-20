@@ -16,7 +16,11 @@ export interface PortMetadata {
   displayName: string;
 }
 
-export const useSerialPort = () => {
+interface UseSerialPortProps {
+  onDisconnect?: () => void;
+}
+
+export const useSerialPort = ({ onDisconnect }: UseSerialPortProps = {}) => {
   // Connection states
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
   const [selectedArch, setSelectedArch] = useState<string>('esp32');
@@ -107,7 +111,16 @@ export const useSerialPort = () => {
     if (!isUnexpected) {
       appendLog('INFO', 'Disconnected successfully.');
     }
-  }, [appendLog, cleanupPort]);
+
+    // STATE-007: portRef and readerRef not nulled after disconnect
+    // Fix: portRef.current = null and readerRef.current = null as last steps in disconnect handler
+    portRef.current = null;
+    readerRef.current = null;
+
+    if (onDisconnect) {
+      onDisconnect();
+    }
+  }, [appendLog, cleanupPort, onDisconnect]);
 
   // Async read loop
   const startReadLoop = useCallback(async (port: SerialPort) => {
@@ -232,6 +245,11 @@ export const useSerialPort = () => {
 
       // Open connection
       await port.open({ baudRate: openBaud });
+
+      // Attach ondisconnect handler
+      port.ondisconnect = () => {
+        disconnect(true);
+      };
 
       setConnectionStatus('connected');
       setConnectionTimestamp(getFormattedTime());

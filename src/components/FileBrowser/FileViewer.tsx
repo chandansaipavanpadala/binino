@@ -127,7 +127,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({
     setErrorMessage(null);
 
     try {
-      const response = await fetch('http://localhost:8000/api/explain-source', {
+      const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
+      const response = await fetch(`http://${host}:8000/api/explain-source`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

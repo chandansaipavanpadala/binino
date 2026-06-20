@@ -47,6 +47,14 @@ export const useBackendHandoff = ({
    * Resets hook progress states back to default idle.
    */
   const resetHandoff = useCallback(() => {
+    if (xhrRef.current) {
+      xhrRef.current.abort();
+      xhrRef.current = null;
+    }
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
     setUploadStatus('idle');
     setUploadProgress(0);
     setAnalysisProgress(0);
@@ -87,7 +95,8 @@ export const useBackendHandoff = ({
     }
 
     appendLog('INFO', `Connecting to progress event stream for job: ${targetJobId}...`);
-    const sseUrl = `http://localhost:8000/api/analyze/${targetJobId}`;
+    const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
+    const sseUrl = `http://${host}:8000/api/analyze/${targetJobId}`;
     const es = new EventSource(sseUrl);
     eventSourceRef.current = es;
 
@@ -145,8 +154,9 @@ export const useBackendHandoff = ({
       // Avoid overwrite error state if closed successfully
       setUploadStatus((prev) => {
         if (prev === 'done' || prev === 'error') return prev;
-        appendLog('ERROR', 'Cannot connect to Binino server on localhost:8000. Run: python -m uvicorn server.main:app --port 8000');
-        setErrorMessage('Cannot connect to Binino server on localhost:8000.');
+        const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
+        appendLog('ERROR', `Cannot connect to Binino server on ${host}:8000. Run: python -m uvicorn server.main:app --port 8000`);
+        setErrorMessage(`Cannot connect to Binino server on ${host}:8000.`);
         return 'error';
       });
       es.close();
@@ -553,9 +563,10 @@ app_main:
 
     // Handle network disruptions
     xhr.onerror = () => {
+      const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
       setUploadStatus('error');
-      setErrorMessage('Network error occurred. Ensure Python FastAPI server is active on port 8000.');
-      appendLog('ERROR', 'Failed to reach decompiler server at http://localhost:8000. Server offline?');
+      setErrorMessage(`Network error occurred. Ensure Python FastAPI server is active on port 8000.`);
+      appendLog('ERROR', `Failed to reach decompiler server at http://${host}:8000. Server offline?`);
       xhrRef.current = null;
     };
 
@@ -566,7 +577,8 @@ app_main:
     formData.append('arch', selectedArch);
     formData.append('flash_size', flashBuffer.length.toString());
 
-    xhr.open('POST', 'http://localhost:8000/api/upload');
+    const dynamicHost = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
+    xhr.open('POST', `http://${dynamicHost}:8000/api/upload`);
     xhr.send(formData);
 
   }, [flashBuffer, extractionStatus, selectedArch, appendLog, isDemoMode, connectSSE, resetHandoff]);

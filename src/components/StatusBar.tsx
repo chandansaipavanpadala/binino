@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAppContext } from '../context/AppContext';
+import { APP_VERSION } from '../utils/version';
 
 export const StatusBar: React.FC = () => {
   const { connectionStatus, portInfo, selectedArch, flashBuffer } = useAppContext();
@@ -58,7 +59,7 @@ export const StatusBar: React.FC = () => {
       </div>
 
       {/* Right: version */}
-      <span>BININO v2.0.5</span>
+      <span>BININO v{APP_VERSION}</span>
     </div>
   );
 };

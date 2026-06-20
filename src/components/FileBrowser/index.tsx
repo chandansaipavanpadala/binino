@@ -3,7 +3,7 @@ import { FileTree, FileNode } from './FileTree';
 import { FileViewer } from './FileViewer';
 import { ReplPassthrough } from './ReplPassthrough';
 import { useAppContext } from '../../context/AppContext';
-import { FolderOpen, Terminal, DownloadCloud } from 'lucide-react';
+import { FolderOpen, Terminal, DownloadCloud, AlertTriangle } from 'lucide-react';
 import JSZip from 'jszip';
 
 // Hardcoded mock files for simulation and reliable fallback
@@ -489,19 +489,33 @@ export const FileBrowser: React.FC = () => {
     portRef,
     pauseReadLoop,
     resumeReadLoop,
-    isDemoMode
+    isDemoMode,
+    fileList: files,
+    setFileList: setFiles,
+    selectedFile,
+    setSelectedFile,
+    selectedFileContent: fileContent,
+    setSelectedFileContent: setFileContent
   } = useAppContext();
 
   const [activeTab, setActiveTab] = useState<'files' | 'repl'>('files');
-  const [files, setFiles] = useState<FileNode[]>([]);
-  const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
-  const [fileContent, setFileContent] = useState('');
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [loadingContent, setLoadingContent] = useState(false);
 
-  // Generate mock filesystem structures for active runtime
+  if (connectionStatus !== 'connected') {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 bg-[#111111] rounded-lg border border-[var(--border-subtle)] text-center space-y-3 min-h-[300px]">
+        <AlertTriangle className="h-6 w-6 text-[var(--status-error)]" />
+        <h3 className="text-sm font-semibold">File Browser Disconnected</h3>
+        <p className="text-xs text-[var(--text-muted)] max-w-sm">
+          Please connect a device supporting interpreted runtimes to view filesystem.
+        </p>
+      </div>
+    );
+  }
+
   const generateMockFiles = useCallback(() => {
-    const r = detectedRuntime.toLowerCase();
+    const r = (detectedRuntime || 'compiled').toLowerCase();
     
     if (r === 'micropython' || r === 'circuitpython') {
       return [
@@ -539,7 +553,7 @@ export const FileBrowser: React.FC = () => {
     if (connectionStatus === 'connected' && !isDemoMode && portRef.current) {
       try {
         await pauseReadLoop();
-        const mcuFiles = await queryFilesystemOverSerial(portRef.current, detectedRuntime, appendLog);
+        const mcuFiles = await queryFilesystemOverSerial(portRef.current, detectedRuntime || 'compiled', appendLog);
         setFiles(mcuFiles);
         appendLog('INFO', `[Filesystem] Real MCU files loaded successfully (found ${mcuFiles.length} root items).`);
       } catch (err: any) {
@@ -582,7 +596,7 @@ export const FileBrowser: React.FC = () => {
     } else if (connectionStatus === 'connected' && !isDemoMode && portRef.current) {
       try {
         await pauseReadLoop();
-        const text = await readFileOverSerial(portRef.current, detectedRuntime, file.path, appendLog);
+        const text = await readFileOverSerial(portRef.current, detectedRuntime || 'compiled', file.path, appendLog);
         setFileContent(text);
       } catch (err: any) {
         appendLog('ERROR', `[Filesystem] Read failed for ${file.name}: ${err.message || err}`);
@@ -619,7 +633,7 @@ export const FileBrowser: React.FC = () => {
               const fileObj = await n.handle.getFile();
               text = await fileObj.text();
             } else if (connectionStatus === 'connected' && !isDemoMode && portRef.current) {
-              text = await readFileOverSerial(portRef.current, detectedRuntime, n.path, appendLog);
+              text = await readFileOverSerial(portRef.current, detectedRuntime || 'compiled', n.path, appendLog);
             } else {
               text = MOCK_FILES[n.path] || `# contents of ${n.name}`;
             }
@@ -690,7 +704,7 @@ export const FileBrowser: React.FC = () => {
             onRefresh={loadFilesystem}
             onLocalFilesLoaded={handleLocalFilesLoaded}
             loading={loadingFiles}
-            detectedRuntime={detectedRuntime}
+            detectedRuntime={detectedRuntime || 'compiled'}
           />
         </div>
 
@@ -727,9 +741,9 @@ export const FileBrowser: React.FC = () => {
             {activeTab === 'files' ? (
               <FileViewer
                 file={selectedFile}
-                content={fileContent}
+                content={fileContent || ''}
                 loading={loadingContent}
-                runtime={detectedRuntime}
+                runtime={detectedRuntime || 'compiled'}
                 arch={selectedArch}
               />
             ) : (

@@ -1,9 +1,11 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { getFormattedTime } from '../utils/time';
 import { useSerialPort } from '../hooks/useSerialPort';
 import { useFlashExtractor } from '../hooks/useFlashExtractor';
 import { useBackendHandoff } from '../hooks/useBackendHandoff';
 import { useSmartDetect, DetectStatus, Confidence, RecommendedAction, FilesystemCommands } from '../hooks/useSmartDetect';
+import { useAIExplain, ExplainStatus } from '../hooks/useAIExplain';
+import { FileNode } from '../components/FileBrowser/FileTree';
 import type { AnalysisResult } from '../types/analysis';
 import type { ConnectionStatus, TerminalLog, PortMetadata } from '../hooks/useSerialPort';
 import type { ExtractionStatus } from '../hooks/useFlashExtractor';
@@ -58,7 +60,7 @@ interface AppContextValue {
 
   // Detection
   detectStatus: DetectStatus;
-  detectedRuntime: string;
+  detectedRuntime: string | null;
   runtimeVersion: string | null;
   confidence: Confidence;
   recommendedAction: RecommendedAction;
@@ -79,6 +81,29 @@ interface AppContextValue {
   setIsDemoMode: (v: boolean) => void;
   isExplorerOpen: boolean;
   setIsExplorerOpen: (v: boolean) => void;
+
+  // File Browser lifted states
+  fileList: FileNode[];
+  setFileList: React.Dispatch<React.SetStateAction<FileNode[]>>;
+  selectedFile: FileNode | null;
+  setSelectedFile: React.Dispatch<React.SetStateAction<FileNode | null>>;
+  selectedFileContent: string | null;
+  setSelectedFileContent: React.Dispatch<React.SetStateAction<string | null>>;
+
+  // AI Explain lifted states
+  explainStatus: ExplainStatus;
+  streamedText: string;
+  tokensUsed: number | null;
+  explainError: string | null;
+  explain: (functionName: string, arch: string, result: AnalysisResult) => Promise<void>;
+  clearExplainTimers: () => void;
+
+  // Workflow Stage state
+  workflowStage: string;
+  setWorkflowStage: (stage: string) => void;
+
+  // Global reset
+  resetAllPipelineState: () => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -90,11 +115,33 @@ export const useAppContext = (): AppContextValue => {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const serial = useSerialPort();
-  const smartDetect = useSmartDetect();
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [isExplorerOpen, setIsExplorerOpen] = useState(false);
   const [forceBinaryExtraction, setForceBinaryExtraction] = useState(false);
+
+  // File browser lifted states
+  const [fileList, setFileList] = useState<FileNode[]>([]);
+  const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
+  const [selectedFileContent, setSelectedFileContent] = useState<string | null>(null);
+
+  // Workflow Stage state
+  const [workflowStage, setWorkflowStage] = useState<string>('bridge');
+
+  // AI Explain global hook
+  const aiExplain = useAIExplain(isDemoMode);
+
+  // Setup disconnect callback ref to break circular dependency with serial port hook
+  const onDisconnectRef = useRef<(() => void) | null>(null);
+
+  const serial = useSerialPort({
+    onDisconnect: () => {
+      if (onDisconnectRef.current) {
+        onDisconnectRef.current();
+      }
+    }
+  });
+
+  const smartDetect = useSmartDetect();
 
   const handleExtractionDone = useCallback((buffer: Uint8Array) => {
     serial.appendLog('INFO', `Flash image complete (${buffer.length} bytes). Handoff pipeline unlocked.`);
@@ -118,6 +165,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     appendLog: serial.appendLog,
     isDemoMode,
   });
+
+  // Central reset function
+  const resetAllPipelineState = useCallback(() => {
+    // 1. Clear raw bytes hexBuffer
+    serial.setHexBuffer(new Uint8Array(0));
+
+    // 2. Clear smart detect
+    smartDetect.resetDetection();
+
+    // 3. Clear extraction states
+    extraction.resetExtraction();
+
+    // 4. Clear handoff decompiler and event streams
+    handoff.resetHandoff();
+
+    // 5. Clear AI Explain timers
+    aiExplain.clearExplanation();
+
+    // 6. Clear File Browser
+    setFileList([]);
+    setSelectedFile(null);
+    setSelectedFileContent(null);
+
+    // 7. Close Code Explorer
+    setIsExplorerOpen(false);
+
+    // 8. Reset workflow stage
+    setWorkflowStage('bridge');
+
+    // 9. Reset force binary extraction
+    setForceBinaryExtraction(false);
+
+    // 10. Append separator to terminal logs
+    serial.appendLog('INFO', '─── Session cleared ───');
+  }, [serial, smartDetect, extraction, handoff, aiExplain]);
+
+  // Sync ref callback
+  useEffect(() => {
+    onDisconnectRef.current = resetAllPipelineState;
+  }, [resetAllPipelineState]);
+
+  // Wrap connect to reset state first
+  const connect = useCallback(async () => {
+    resetAllPipelineState();
+    await serial.connect();
+  }, [serial, resetAllPipelineState]);
 
   // Automatically trigger smart detection on connection
   useEffect(() => {
@@ -148,6 +241,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [serial.connectionStatus, serial.selectedArch, isDemoMode]);
 
   // Sync Demo Mode with serial bridge state
+  const prevDemoRef = useRef(isDemoMode);
   useEffect(() => {
     if (isDemoMode) {
       serial.setConnectionStatus('connected');
@@ -163,18 +257,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         { id: 'demo-2', timestamp: now, level: 'INFO', message: 'Smart Detector will auto-probe when connected.' },
       ]);
     } else {
-      serial.setConnectionStatus('idle');
-      serial.setPortInfo(null);
-      serial.setConnectionTimestamp(null);
-      serial.setTerminalLogs([]);
-      handoff.resetHandoff();
-      smartDetect.resetDetection();
-      setForceBinaryExtraction(false);
+      if (prevDemoRef.current === true) {
+        serial.disconnect();
+      }
     }
+    prevDemoRef.current = isDemoMode;
   }, [isDemoMode]);
 
   const value: AppContextValue = {
     ...serial,
+    connect,
     extractionStatus: extraction.extractionStatus,
     bytesRead: extraction.bytesRead,
     totalBytes: extraction.totalBytes,
@@ -211,6 +303,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsDemoMode,
     isExplorerOpen,
     setIsExplorerOpen,
+
+    // File Browser
+    fileList,
+    setFileList,
+    selectedFile,
+    setSelectedFile,
+    selectedFileContent,
+    setSelectedFileContent,
+
+    // AI Explain
+    explainStatus: aiExplain.explainStatus,
+    streamedText: aiExplain.streamedText,
+    tokensUsed: aiExplain.tokensUsed,
+    explainError: aiExplain.errorMessage,
+    explain: aiExplain.explain,
+    clearExplainTimers: aiExplain.clearExplanation,
+
+    // Workflow Stage
+    workflowStage,
+    setWorkflowStage,
+
+    // Central Reset
+    resetAllPipelineState,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

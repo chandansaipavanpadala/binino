@@ -12,14 +12,12 @@ interface CodeExplorerProps {
   result: AnalysisResult;
   flashBuffer: Uint8Array | null;
   onClose: () => void;
-  isDemoMode: boolean;
 }
 
 export const CodeExplorer: React.FC<CodeExplorerProps> = ({
   result,
   flashBuffer,
   onClose,
-  isDemoMode,
 }) => {
   const {
     activeFunction,
@@ -381,7 +379,6 @@ export const CodeExplorer: React.FC<CodeExplorerProps> = ({
                   wordWrap={wordWrapEnabled}
                   setWordWrap={setWordWrapEnabled}
                   filename={filename}
-                  isDemoMode={isDemoMode}
                 />
               )}
               {activeMobilePane === 'hex' && (
@@ -423,7 +420,6 @@ export const CodeExplorer: React.FC<CodeExplorerProps> = ({
                     wordWrap={wordWrapEnabled}
                     setWordWrap={setWordWrapEnabled}
                     filename={filename}
-                    isDemoMode={isDemoMode}
                   />
                 </div>
 

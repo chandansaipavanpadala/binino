@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { AnalysisResult, FunctionRecord } from '../../types/analysis';
 import { highlightC, highlightAsm } from './SyntaxHighlighter';
-import { useAIExplain } from '../../hooks/useAIExplain';
+import { useAppContext } from '../../context/AppContext';
 
 interface CodeViewerPaneProps {
   result: AnalysisResult;
@@ -11,7 +11,6 @@ interface CodeViewerPaneProps {
   wordWrap: boolean;
   setWordWrap: (wrap: boolean) => void;
   filename: string;
-  isDemoMode: boolean;
 }
 
 export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
@@ -22,7 +21,6 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
   wordWrap,
   setWordWrap,
   filename,
-  isDemoMode,
 }) => {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
 
@@ -30,10 +28,10 @@ export const CodeViewerPane: React.FC<CodeViewerPaneProps> = ({
     explainStatus,
     streamedText,
     tokensUsed,
-    errorMessage,
+    explainError: errorMessage,
     explain,
-    clearExplanation,
-  } = useAIExplain(isDemoMode);
+    clearExplainTimers: clearExplanation,
+  } = useAppContext();
 
   // Automatically reset the explanation and close the panel when switching functions
   useEffect(() => {

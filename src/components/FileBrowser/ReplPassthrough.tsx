@@ -125,7 +125,7 @@ export const ReplPassthrough: React.FC = () => {
         {filteredLogs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full space-y-1" style={{ color: 'var(--text-muted)' }}>
             <span className="font-sans text-xs">REPL Console Active. Connect device and execute commands.</span>
-            <span className="text-[10px] font-mono">runtime: {detectedRuntime.toUpperCase()}</span>
+            <span className="text-[10px] font-mono">runtime: {(detectedRuntime || 'compiled').toUpperCase()}</span>
           </div>
         ) : (
           filteredLogs.map((log) => {
