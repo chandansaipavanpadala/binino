@@ -151,6 +151,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     selectedArch: serial.selectedArch,
     isDemoMode,
     onExtractionDone: handleExtractionDone,
+    setHexBuffer: serial.setHexBuffer,
   });
 
   const handoff = useBackendHandoff({

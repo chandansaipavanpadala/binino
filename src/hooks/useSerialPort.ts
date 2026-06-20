@@ -308,16 +308,19 @@ export const useSerialPort = ({ onDisconnect }: UseSerialPortProps = {}) => {
   // Temporarily suspends the background serial reader loop
   const pauseReadLoop = useCallback(async () => {
     pauseCountRef.current++;
-    if (pauseCountRef.current > 1) {
-      console.warn(`[SerialPort] pauseReadLoop called when already paused, count: ${pauseCountRef.current}`);
-    }
     isReadingRef.current = false;
-    if (readerRef.current) {
+    if (pauseCountRef.current === 1 && readerRef.current) {
       try {
         await readerRef.current.cancel();
       } catch (err) {
         console.warn('Error cancelling reader in pause:', err);
       }
+      try {
+        readerRef.current.releaseLock();
+      } catch (err) {
+        console.warn('Error releasing reader lock in pause:', err);
+      }
+      readerRef.current = null;
     }
   }, []);
 

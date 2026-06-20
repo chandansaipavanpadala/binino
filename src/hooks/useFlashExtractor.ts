@@ -13,6 +13,7 @@ interface UseFlashExtractorProps {
   selectedArch: string;
   isDemoMode: boolean;
   onExtractionDone?: (buffer: Uint8Array) => void;
+  setHexBuffer?: React.Dispatch<React.SetStateAction<Uint8Array>>;
 }
 
 /**
@@ -97,6 +98,7 @@ export const useFlashExtractor = ({
   selectedArch,
   isDemoMode,
   onExtractionDone,
+  setHexBuffer,
 }: UseFlashExtractorProps) => {
   const [extractionStatus, setExtractionStatus] = useState<ExtractionStatus>('idle');
   const [bytesRead, setBytesRead] = useState<number>(0);
@@ -662,6 +664,7 @@ export const useFlashExtractor = ({
     setTotalBytes(targetSize);
     setProgressPercent(0);
     setFlashBuffer(null);
+    setHexBuffer?.(new Uint8Array(0)); // clear sketch serial pollution
 
     // --- MOCK SIMULATION MODE ---
     if (isDemoMode) {
@@ -701,6 +704,7 @@ export const useFlashExtractor = ({
         const percent = Math.round((readCount / targetSize) * 100);
         setProgressPercent(percent);
         setFlashBuffer(new Uint8Array(tempBuffer));
+        setHexBuffer?.(new Uint8Array(tempBuffer.slice(0, readCount)));
 
         // Specific logs required by visual specs
         if (offset === 0x001400) {
@@ -716,6 +720,7 @@ export const useFlashExtractor = ({
       }
 
       setFlashBuffer(tempBuffer);
+      setHexBuffer?.(new Uint8Array(tempBuffer));
       setExtractionStatus('done');
       appendLog('INFO', `Extraction complete. ${targetSize} bytes read. Binary ready for download.`);
       
@@ -862,6 +867,7 @@ export const useFlashExtractor = ({
           offset += pageSize;
           setBytesRead(offset);
           setProgressPercent(Math.round((offset / targetSize) * 100));
+          setHexBuffer?.(new Uint8Array(buffer.slice(0, offset)));
 
           if (offset % (pageSize * 16) === 0 || offset === targetSize) {
             const hexOffset = `0x${offset.toString(16).toUpperCase().padStart(6, '0')}`;
@@ -870,6 +876,7 @@ export const useFlashExtractor = ({
         }
 
         setFlashBuffer(buffer);
+        setHexBuffer?.(new Uint8Array(buffer));
         setExtractionStatus('done');
         appendLog('INFO', `Extraction complete. ${targetSize} bytes read. Binary ready for download.`);
         if (onExtractionDone) {
@@ -943,6 +950,7 @@ export const useFlashExtractor = ({
           offset += currentBlockSize;
           setBytesRead(offset);
           setProgressPercent(Math.round((offset / targetSize) * 100));
+          setHexBuffer?.(new Uint8Array(buffer.slice(0, offset)));
 
           // Periodically log progress blocks
           if (offset === 0x001400) {
@@ -954,6 +962,7 @@ export const useFlashExtractor = ({
         }
 
         setFlashBuffer(buffer);
+        setHexBuffer?.(new Uint8Array(buffer));
         setExtractionStatus('done');
         appendLog('INFO', `Extraction complete. ${targetSize} bytes read. Binary ready for download.`);
         
