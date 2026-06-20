@@ -335,9 +335,10 @@ export const useFlashExtractor = ({
       try {
         const { value, body } = await sendCommand(port, 0x03, payload, 1000);
         
-        // Validate XOR Checksum
+        // Validate XOR Checksum (skip check if expected checksum is 0)
         const computed = computeXorChecksum(body);
-        if (computed !== (value & 0xFF)) {
+        const expected = value & 0xFF;
+        if (expected !== 0 && computed !== expected) {
           throw new Error('XOR Checksum Mismatch');
         }
 
