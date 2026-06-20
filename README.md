@@ -4,7 +4,7 @@ BININO is a universal, web-based toolkit designed for firmware extraction, stati
 
 ---
 
-`Version 2.1.6` • `FastAPI Backend` • `React + Vite Frontend` • `50 MCU Profiles` • `10 Flash Protocols`
+`Version 2.2.4` • `FastAPI Backend` • `React + Vite Frontend` • `50 MCU Profiles` • `10 Flash Protocols`
 
 ---
 
@@ -134,14 +134,14 @@ Phase 6 adds layout responsiveness and operation protections:
 * **Active Extraction Lock**: Toggling expansion of the Hex Buffer Preview is locked and disabled with visual indicators (lock icon, opacity fade, tooltip warnings) during active extraction runs, preventing serial log scrolling disruptions.
 * **Landing Page Visibility**: Optimized paddings and margins on the home landing page to draw the wordmark and cards upwards, keeping the footer visible in standard viewports without requiring vertical scrollbar adjustments.
 
-### Phase 7: Smart Runtime Detection (v2.1.6)
+### Phase 7: Smart Runtime Detection (v2.2.4)
 Phase 7 introduces automatic environment detection to identify interpreted microcontrollers:
 * **Asynchronous Serial Probing Hook**: `useSmartDetect.ts` implements a multi-sequence port prober with `Promise.race` and a 3-second timeout. Checks for REPL prompts, lua prompts, and AT-commands.
 * **State Management**: Integrated into `AppContext.tsx` to pause/resume standard serial loops during detection sequences and support manual override toggles.
 * **Regex Detection Service**: Matches port data against defined signatures on the backend (`runtime_detector.py`) to classify environments.
 * **Failsafe Actions**: Maps runtimes to appropriate views, suggesting ROM extraction only for compiled firmware to prevent users from dumping the interpreter itself.
 
-### Phase 8: Interactive File Browser (v2.1.6)
+### Phase 8: Interactive File Browser (v2.2.4)
 Phase 8 implements the browser UI for direct file reads and execution on interpreted runtimes:
 * **Interactive Directory Tree**: Lists directories and files, styling them with file icons. Supports micro-animations on expansion and selection.
 * **Local Drive Mount Picker**: Mounts CircuitPython directories via browser local folder handle queries (`showDirectoryPicker`), enabling local system syncs.
@@ -269,7 +269,7 @@ The FastAPI backend exposes the following endpoints:
 
 ## Microcontroller Registry Reference Table
 
-BININO v2.1.6 includes support for 50 distinct microcontroller variants across 14 major chip families:
+BININO v2.2.4 includes support for 50 distinct microcontroller variants across 14 major chip families:
 
 | Family | MCU ID | Display Name | Bootloader Protocol | Flash Base | Default Flash Size | Common Runtimes |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
