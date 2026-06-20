@@ -66,11 +66,14 @@ const App: React.FC = () => {
 
   // STATE-015: Refresh guard redirects to '/' when connectionStatus==='idle' AND flashBuffer===null
   useEffect(() => {
+    const wasConnected = sessionStorage.getItem('binino_was_connected') === 'true';
     if (
       (location.pathname === '/dashboard' || location.pathname === '/explorer') &&
       connectionStatus === 'idle' &&
-      flashBuffer === null
+      flashBuffer === null &&
+      wasConnected
     ) {
+      sessionStorage.removeItem('binino_was_connected');
       alert("Session data was lost on refresh — please reconnect.");
       navigate('/', { replace: true });
     }

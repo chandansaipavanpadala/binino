@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { ConnectionStatus } from './useSerialPort';
+import { MCU_REGISTRY } from '../utils/mcuRegistry';
 
 export type ExtractionStatus = 'idle' | 'syncing' | 'reading' | 'done' | 'error';
 
@@ -362,9 +363,14 @@ export const useFlashExtractor = ({
    * @param targetSize The flash size in bytes to extract.
    */
   const startExtraction = async (arch: string, targetSize: number): Promise<void> => {
-    if (arch === 'avr') {
-      appendLog('WARN', 'AVR architecture is not supported in Phase 2 (Phase 3 Stub only).');
-      setErrorMessage('AVR is not supported in Phase 2.');
+    const profile = MCU_REGISTRY[arch];
+    const isAvr = profile?.family === 'AVR' || arch === 'avr';
+    const isUnsupportedProtocol = profile && profile.protocol !== 'SLIP';
+
+    if ((isAvr || isUnsupportedProtocol) && !isDemoMode) {
+      const mcuName = profile?.display_name || arch.toUpperCase();
+      appendLog('WARN', `${mcuName} extraction is not supported in real Web Serial mode (requires external programmer or specialized tools).`);
+      setErrorMessage(`${mcuName} is not supported for serial extraction in real mode.`);
       setExtractionStatus('error');
       return;
     }

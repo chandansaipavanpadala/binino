@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { Cpu, Zap, Shield, Code, ArrowRight, Github, BookOpen, HelpCircle } from 'lucide-react';
+import { APP_VERSION } from '../utils/version';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -70,7 +71,7 @@ const LandingPage: React.FC = () => {
           {/* Version badge */}
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-[11px] font-mono tracking-wide" style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--status-live)' }}></span>
-            <span>v2.1.6 — Production Release</span>
+            <span>v{APP_VERSION} — Production Release</span>
           </div>
 
           {/* Wordmark */}
@@ -134,7 +135,7 @@ const LandingPage: React.FC = () => {
 
       {/* Footer (inline on landing) */}
       <footer className="py-4 px-6 flex items-center justify-between text-[10px]" style={{ borderTop: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
-        <span>BININO v2.1.6</span>
+        <span>BININO v{APP_VERSION}</span>
         <span>Built by Chandan Sai Pavan Padala</span>
         <a href="https://github.com/chandansaipavanpadala/binino" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-1 hover:opacity-80 transition-opacity" style={{ color: 'var(--text-muted)' }}>
           <Github className="h-3 w-3" />

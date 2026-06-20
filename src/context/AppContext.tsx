@@ -168,6 +168,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Central reset function
   const resetAllPipelineState = useCallback(() => {
+    // Clear session storage flag
+    sessionStorage.removeItem('binino_was_connected');
+
     // 1. Clear raw bytes hexBuffer
     serial.setHexBuffer(new Uint8Array(0));
 
@@ -200,6 +203,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 10. Append separator to terminal logs
     serial.appendLog('INFO', '─── Session cleared ───');
   }, [serial, smartDetect, extraction, handoff, aiExplain]);
+
+  // Sync sessionStorage for wasConnected
+  useEffect(() => {
+    if (serial.connectionStatus === 'connected' || extraction.flashBuffer !== null) {
+      sessionStorage.setItem('binino_was_connected', 'true');
+    }
+  }, [serial.connectionStatus, extraction.flashBuffer]);
 
   // Sync ref callback
   useEffect(() => {
