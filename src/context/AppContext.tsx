@@ -46,6 +46,7 @@ interface AppContextValue {
   startExtraction: (arch: string, targetSize: number) => Promise<void>;
   cancelExtraction: () => void;
   downloadBin: () => void;
+  loadBinary: (buffer: Uint8Array) => void;
 
   // Handoff
   uploadStatus: UploadStatus;
@@ -286,6 +287,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     startExtraction: extraction.startExtraction,
     cancelExtraction: extraction.cancelExtraction,
     downloadBin: extraction.downloadBin,
+    loadBinary: extraction.loadBinary,
     uploadStatus: handoff.uploadStatus,
     uploadProgress: handoff.uploadProgress,
     analysisProgress: handoff.analysisProgress,

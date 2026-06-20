@@ -564,6 +564,21 @@ export const useFlashExtractor = ({
     abortRef.current = false;
   }, []);
 
+  /**
+   * Loads a local pre-extracted binary file into flash buffer and completes extraction state.
+   */
+  const loadBinary = useCallback((buffer: Uint8Array) => {
+    setFlashBuffer(buffer);
+    setExtractionStatus('done');
+    setBytesRead(buffer.length);
+    setTotalBytes(buffer.length);
+    setProgressPercent(100);
+    appendLog('INFO', `Loaded local binary firmware file (${buffer.length} bytes). Handoff pipeline unlocked.`);
+    if (onExtractionDone) {
+      onExtractionDone(buffer);
+    }
+  }, [onExtractionDone, appendLog]);
+
   return {
     extractionStatus,
     bytesRead,
@@ -575,5 +590,6 @@ export const useFlashExtractor = ({
     cancelExtraction,
     downloadBin,
     resetExtraction,
+    loadBinary,
   };
 };

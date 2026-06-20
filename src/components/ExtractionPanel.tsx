@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ExtractionStatus } from '../hooks/useFlashExtractor';
 import { ConnectionStatus } from '../hooks/useSerialPort';
-import { Download, Cpu, XCircle } from 'lucide-react';
+import { Download, Cpu, XCircle, FileUp } from 'lucide-react';
+import { useAppContext } from '../context/AppContext';
 
 interface ExtractionPanelProps {
   connectionStatus: ConnectionStatus;
@@ -42,6 +43,23 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
 }) => {
   const [selectedSize, setSelectedSize] = useState<number>(defaultFlashSize || 0x400000); // Default 4MB
   const isCollapsed = !isExpanded;
+  
+  const { loadBinary } = useAppContext();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (reader.result instanceof ArrayBuffer) {
+        const buffer = new Uint8Array(reader.result);
+        loadBinary(buffer);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
 
   // Sync selected size with selected MCU defaults
   useEffect(() => {
@@ -306,6 +324,30 @@ export const ExtractionPanel: React.FC<ExtractionPanelProps> = ({
                 <Download className="h-3.5 w-3.5" />
                 <span>Download Partial Backup ({Math.round(bytesRead / 1024)}KB)</span>
               </button>
+            )}
+
+            {/* Local Binary Upload Bypass */}
+            {!isRunning && (
+              <div className="pt-3 flex flex-col space-y-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                <span className="text-[9px] font-mono tracking-wider text-[var(--text-muted)] uppercase">
+                  Alternative: Local File
+                </span>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept=".bin,.img,.hex"
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded border border-[var(--border-strong)] bg-[#1A1A1A] hover:bg-[#222222] transition-all duration-150 text-[var(--text-primary)]"
+                >
+                  <FileUp className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
+                  <span>Upload Local Binary (.bin)</span>
+                </button>
+              </div>
             )}
           </div>
 
