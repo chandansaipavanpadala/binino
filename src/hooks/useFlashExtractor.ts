@@ -335,14 +335,17 @@ export const useFlashExtractor = ({
       try {
         const { value, body } = await sendCommand(port, 0x03, payload, 1000);
         
+        // Slice body to exactly the requested size (e.g. 1024 bytes) to drop trailing status/padding bytes
+        const dataPayload = body.slice(0, size);
+        
         // Validate XOR Checksum (skip check if expected checksum is 0)
-        const computed = computeXorChecksum(body);
+        const computed = computeXorChecksum(dataPayload);
         const expected = value & 0xFF;
         if (expected !== 0 && computed !== expected) {
           throw new Error('XOR Checksum Mismatch');
         }
 
-        return body;
+        return dataPayload;
       } catch (err: any) {
         if (retry === 3) {
           throw new Error(`Block read failed after 3 attempts. ${err.message || ''}`);
