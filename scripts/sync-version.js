@@ -29,3 +29,13 @@ readme = readme.replace(/BININO v\d+\.\d+\.\d+/g, `BININO v${version}`);
 // Write back README.md
 fs.writeFileSync(readmePath, readme, 'utf8');
 console.log(`[Version Sync] Successfully synced version ${version} to README.md`);
+
+// Sync server/main.py
+const mainPyPath = path.join(rootDir, 'server', 'main.py');
+if (fs.existsSync(mainPyPath)) {
+  let mainPy = fs.readFileSync(mainPyPath, 'utf8');
+  mainPy = mainPy.replace(/version="[0-9.]+"/g, `version="${version}"`);
+  mainPy = mainPy.replace(/"version": "[0-9.]+"/g, `"version": "${version}"`);
+  fs.writeFileSync(mainPyPath, mainPy, 'utf8');
+  console.log(`[Version Sync] Successfully synced version ${version} to server/main.py`);
+}

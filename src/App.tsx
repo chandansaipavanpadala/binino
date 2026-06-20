@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
@@ -55,27 +55,25 @@ const App: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { setIsDemoMode, connectionStatus, flashBuffer, resetAllPipelineState } = useAppContext();
-  const prevPathRef = useRef<string>('');
 
   // STATE-001 / STATE-014: when pathname becomes '/', reset isDemoMode. Do NOT reset on FAQ or manual.
   useEffect(() => {
-    if (location.pathname === '/' && prevPathRef.current !== '/') {
+    if (location.pathname === '/') {
       setIsDemoMode(false);
       resetAllPipelineState();
     }
-    prevPathRef.current = location.pathname;
   }, [location.pathname, setIsDemoMode, resetAllPipelineState]);
 
-  // STATE-015: Refresh guard redirects to '/' when connectionStatus==='idle' AND flashBuffer===null
+  // STATE-015: Refresh guard redirects to '/' when connectionStatus==='idle' AND flashBuffer===null AND session was active
   useEffect(() => {
-    const wasConnected = sessionStorage.getItem('binino_was_connected') === 'true';
+    const sessionActive = sessionStorage.getItem('binino_session_active');
     if (
       (location.pathname === '/dashboard' || location.pathname === '/explorer') &&
+      sessionActive === 'true' &&
       connectionStatus === 'idle' &&
-      flashBuffer === null &&
-      wasConnected
+      flashBuffer === null
     ) {
-      sessionStorage.removeItem('binino_was_connected');
+      sessionStorage.removeItem('binino_session_active');
       alert("Session data was lost on refresh — please reconnect.");
       navigate('/', { replace: true });
     }

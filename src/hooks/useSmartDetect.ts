@@ -370,8 +370,7 @@ export const useSmartDetect = () => {
       }
       const base64Data = window.btoa(asciiStr);
 
-      const backendUrl = getBackendUrl();
-      const response = await fetch(`${backendUrl}/api/detect`, {
+      const response = await fetch(`${getBackendUrl()}/api/detect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

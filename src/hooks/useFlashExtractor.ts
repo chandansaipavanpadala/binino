@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { ConnectionStatus } from './useSerialPort';
-import { MCU_REGISTRY } from '../utils/mcuRegistry';
 
 export type ExtractionStatus = 'idle' | 'syncing' | 'reading' | 'done' | 'error';
 
@@ -215,33 +214,26 @@ export const useFlashExtractor = ({
     // Await response packet
     const reader = port.readable.getReader();
     try {
-      const startTime = Date.now();
-      while (true) {
-        const elapsedTime = Date.now() - startTime;
-        const remainingTimeout = Math.max(100, timeoutMs - elapsedTime);
-        const responseDecoded = await readSlipPacket(reader, remainingTimeout);
-        
-        if (responseDecoded.length < 8) {
-          throw new Error('Response packet header too short');
-        }
-
-        const respDirection = responseDecoded[0];
-        const respOpcode = responseDecoded[1];
-        const respSize = responseDecoded[2] | (responseDecoded[3] << 8);
-        const respValue = responseDecoded[4] | (responseDecoded[5] << 8) | (responseDecoded[6] << 16) | (responseDecoded[7] << 24);
-        const respBody = responseDecoded.slice(8, 8 + respSize);
-
-        if (respDirection !== 0x01) {
-          console.warn(`[Protocol] Ignored packet with invalid direction: 0x${respDirection.toString(16)}`);
-          continue;
-        }
-        if (respOpcode !== opcode) {
-          console.warn(`[Protocol] Opcode mismatch: expected 0x${opcode.toString(16)}, got 0x${respOpcode.toString(16)}. Stale packet? Ignored.`);
-          continue;
-        }
-
-        return { value: respValue, body: respBody };
+      const responseDecoded = await readSlipPacket(reader, timeoutMs);
+      
+      if (responseDecoded.length < 8) {
+        throw new Error('Response packet header too short');
       }
+
+      const respDirection = responseDecoded[0];
+      const respOpcode = responseDecoded[1];
+      const respSize = responseDecoded[2] | (responseDecoded[3] << 8);
+      const respValue = responseDecoded[4] | (responseDecoded[5] << 8) | (responseDecoded[6] << 16) | (responseDecoded[7] << 24);
+      const respBody = responseDecoded.slice(8, 8 + respSize);
+
+      if (respDirection !== 0x01) {
+        throw new Error(`Invalid direction: expected 0x01, got 0x${respDirection.toString(16)}`);
+      }
+      if (respOpcode !== opcode) {
+        throw new Error(`Opcode mismatch: expected 0x${opcode.toString(16)}, got 0x${respOpcode.toString(16)}`);
+      }
+
+      return { value: respValue, body: respBody };
     } finally {
       reader.releaseLock();
     }
@@ -335,17 +327,13 @@ export const useFlashExtractor = ({
       try {
         const { value, body } = await sendCommand(port, 0x03, payload, 1000);
         
-        // Slice body to exactly the requested size (e.g. 1024 bytes) to drop trailing status/padding bytes
-        const dataPayload = body.slice(0, size);
-        
-        // Validate XOR Checksum (skip check if expected checksum is 0)
-        const computed = computeXorChecksum(dataPayload);
-        const expected = value & 0xFF;
-        if (expected !== 0 && computed !== expected) {
+        // Validate XOR Checksum
+        const computed = computeXorChecksum(body);
+        if (computed !== value) {
           throw new Error('XOR Checksum Mismatch');
         }
 
-        return dataPayload;
+        return body;
       } catch (err: any) {
         if (retry === 3) {
           throw new Error(`Block read failed after 3 attempts. ${err.message || ''}`);
@@ -367,14 +355,9 @@ export const useFlashExtractor = ({
    * @param targetSize The flash size in bytes to extract.
    */
   const startExtraction = async (arch: string, targetSize: number): Promise<void> => {
-    const profile = MCU_REGISTRY[arch];
-    const isAvr = profile?.family === 'AVR' || arch === 'avr';
-    const isUnsupportedProtocol = profile && profile.protocol !== 'SLIP';
-
-    if ((isAvr || isUnsupportedProtocol) && !isDemoMode) {
-      const mcuName = profile?.display_name || arch.toUpperCase();
-      appendLog('WARN', `${mcuName} extraction is not supported in real Web Serial mode (requires external programmer or specialized tools).`);
-      setErrorMessage(`${mcuName} is not supported for serial extraction in real mode.`);
+    if (arch === 'avr') {
+      appendLog('WARN', 'AVR architecture is not supported in Phase 2 (Phase 3 Stub only).');
+      setErrorMessage('AVR is not supported in Phase 2.');
       setExtractionStatus('error');
       return;
     }
@@ -564,21 +547,6 @@ export const useFlashExtractor = ({
     abortRef.current = false;
   }, []);
 
-  /**
-   * Loads a local pre-extracted binary file into flash buffer and completes extraction state.
-   */
-  const loadBinary = useCallback((buffer: Uint8Array) => {
-    setFlashBuffer(buffer);
-    setExtractionStatus('done');
-    setBytesRead(buffer.length);
-    setTotalBytes(buffer.length);
-    setProgressPercent(100);
-    appendLog('INFO', `Loaded local binary firmware file (${buffer.length} bytes). Handoff pipeline unlocked.`);
-    if (onExtractionDone) {
-      onExtractionDone(buffer);
-    }
-  }, [onExtractionDone, appendLog]);
-
   return {
     extractionStatus,
     bytesRead,
@@ -590,6 +558,5 @@ export const useFlashExtractor = ({
     cancelExtraction,
     downloadBin,
     resetExtraction,
-    loadBinary,
   };
 };

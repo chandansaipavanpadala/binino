@@ -128,8 +128,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({
     setErrorMessage(null);
 
     try {
-      const backendUrl = getBackendUrl();
-      const response = await fetch(`${backendUrl}/api/explain-source`, {
+      const response = await fetch(`${getBackendUrl()}/api/explain-source`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

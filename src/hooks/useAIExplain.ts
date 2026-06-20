@@ -140,8 +140,7 @@ export const useAIExplain = (isDemoMode: boolean) => {
     }
 
     try {
-      const backendUrl = getBackendUrl();
-      const response = await fetch(`${backendUrl}/api/explain`, {
+      const response = await fetch(`${getBackendUrl()}/api/explain`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

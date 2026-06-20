@@ -46,7 +46,6 @@ interface AppContextValue {
   startExtraction: (arch: string, targetSize: number) => Promise<void>;
   cancelExtraction: () => void;
   downloadBin: () => void;
-  loadBinary: (buffer: Uint8Array) => void;
 
   // Handoff
   uploadStatus: UploadStatus;
@@ -169,9 +168,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Central reset function
   const resetAllPipelineState = useCallback(() => {
-    // Clear session storage flag
-    sessionStorage.removeItem('binino_was_connected');
-
     // 1. Clear raw bytes hexBuffer
     serial.setHexBuffer(new Uint8Array(0));
 
@@ -203,14 +199,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 10. Append separator to terminal logs
     serial.appendLog('INFO', '─── Session cleared ───');
-  }, [serial, smartDetect, extraction, handoff, aiExplain]);
 
-  // Sync sessionStorage for wasConnected
-  useEffect(() => {
-    if (serial.connectionStatus === 'connected' || extraction.flashBuffer !== null) {
-      sessionStorage.setItem('binino_was_connected', 'true');
-    }
-  }, [serial.connectionStatus, extraction.flashBuffer]);
+    // 11. Clear session storage active flag
+    sessionStorage.removeItem('binino_session_active');
+  }, [serial, smartDetect, extraction, handoff, aiExplain]);
 
   // Sync ref callback
   useEffect(() => {
@@ -275,6 +267,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     prevDemoRef.current = isDemoMode;
   }, [isDemoMode]);
 
+  // Track active session status in sessionStorage to prevent false triggers in the refresh guard
+  useEffect(() => {
+    if (isDemoMode || serial.connectionStatus === 'connected') {
+      sessionStorage.setItem('binino_session_active', 'true');
+    }
+  }, [isDemoMode, serial.connectionStatus]);
+
   const value: AppContextValue = {
     ...serial,
     connect,
@@ -287,7 +286,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     startExtraction: extraction.startExtraction,
     cancelExtraction: extraction.cancelExtraction,
     downloadBin: extraction.downloadBin,
-    loadBinary: extraction.loadBinary,
     uploadStatus: handoff.uploadStatus,
     uploadProgress: handoff.uploadProgress,
     analysisProgress: handoff.analysisProgress,

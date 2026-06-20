@@ -66,8 +66,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
 
   // Fetch MCU registry dynamically from backend, fall back to local import on error
   useEffect(() => {
-    const backendUrl = getBackendUrl();
-    fetch(`${backendUrl}/api/mcu/list`)
+    fetch(`${getBackendUrl()}/api/mcu/list`)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch MCU list');
         return res.json();
