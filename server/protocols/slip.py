@@ -43,14 +43,15 @@ def slip_unframe(framed: bytes) -> bytes:
             i += 1
     return bytes(unframed)
 
+def compute_checksum(data: bytes, seed: int = 0xEF) -> int:
+    """Computes XOR checksum over data bytes starting with seed."""
+    result = seed
+    for b in data:
+        result ^= b
+    return result & 0xFF
+
 def calculate_checksum(data: bytes, seed: int = 0xEF) -> int:
-    """Computes XOR checksum over data bytes.
-    Seed is used as initial value only, not applied to XOR calculation.
-    """
-    checksum = seed
-    for byte in data:
-        checksum ^= byte
-    return checksum
+    return compute_checksum(data, seed)
 
 def chip_detect(ser) -> str:
     """Detects ESP32 variant using READ_MEM opcode 0x0A at address 0x40001000."""
@@ -227,7 +228,7 @@ def read_flash(port: str, mcu_profile, flash_size: int, progress_callback: Calla
                         payload = block_resp[8:8+block_size]
                         # Verify checksum
                         expected_chk = block_resp[4] # Checksum index
-                        actual_chk = calculate_checksum(payload)
+                        actual_chk = compute_checksum(payload)
                         if expected_chk == actual_chk or expected_chk == 0: # 0 means skip check
                             data.extend(payload)
                             success = True

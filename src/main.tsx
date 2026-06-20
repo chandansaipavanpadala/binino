@@ -7,10 +7,10 @@ import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <AppProvider>
-      <HashRouter>
+    <HashRouter>
+      <AppProvider>
         <App />
-      </HashRouter>
-    </AppProvider>
+      </AppProvider>
+    </HashRouter>
   </React.StrictMode>
 );

@@ -78,11 +78,11 @@ export const Navbar: React.FC = () => {
         <div 
           className="flex items-center space-x-1.5 px-2.5 py-1 text-[11px] font-medium rounded border select-none transition-all duration-150 cursor-pointer hover:opacity-85 active:scale-95"
           style={{
-            borderColor: serverOnline ? 'rgba(74, 222, 128, 0.2)' : 'rgba(248, 113, 113, 0.2)',
-            backgroundColor: serverOnline ? 'rgba(74, 222, 128, 0.04)' : 'rgba(248, 113, 113, 0.04)',
-            color: serverOnline ? 'var(--status-live)' : 'var(--status-error)',
+            borderColor: serverOnline ? 'rgba(74, 222, 128, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+            backgroundColor: serverOnline ? 'rgba(74, 222, 128, 0.04)' : 'rgba(245, 158, 11, 0.04)',
+            color: serverOnline ? 'var(--status-live)' : '#F59E0B',
           }}
-          title={serverOnline ? "Backend Decompiler Server is active. Click to configure IP." : "Backend Decompiler Server is unreachable. Click to configure IP."}
+          title={serverOnline ? "Backend Decompiler Server is active. Click to configure IP." : "Server Offline — extraction works, decompilation and AI Explain require the server."}
           onClick={() => {
             const currentUrl = localStorage.getItem('binino_backend_url') || 'http://localhost:8000';
             const newUrl = prompt('Enter your Backend Server URL:', currentUrl);
@@ -100,8 +100,8 @@ export const Navbar: React.FC = () => {
           <span 
             className="w-1.5 h-1.5 rounded-full" 
             style={{ 
-              backgroundColor: serverOnline ? 'var(--status-live)' : 'var(--status-error)',
-              boxShadow: serverOnline ? '0 0 4px var(--status-live)' : 'none'
+              backgroundColor: serverOnline ? 'var(--status-live)' : '#F59E0B',
+              boxShadow: serverOnline ? '0 0 4px var(--status-live)' : '0 0 4px rgba(245, 158, 11, 0.5)'
             }}
           />
           <span>{serverOnline ? 'Server Online' : 'Server Offline'}</span>

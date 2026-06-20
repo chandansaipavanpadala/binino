@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
@@ -64,18 +64,23 @@ const App: React.FC = () => {
     }
   }, [location.pathname, setIsDemoMode, resetAllPipelineState]);
 
-  // STATE-015: Refresh guard redirects to '/' when connectionStatus==='idle' AND flashBuffer===null AND session was active
+  const isFirstRender = useRef(true);
+
+  // STATE-015: Refresh guard redirects to '/' when connectionStatus==='idle' AND flashBuffer===null AND session was active (only on mount)
   useEffect(() => {
-    const sessionActive = sessionStorage.getItem('binino_session_active');
-    if (
-      (location.pathname === '/dashboard' || location.pathname === '/explorer') &&
-      sessionActive === 'true' &&
-      connectionStatus === 'idle' &&
-      flashBuffer === null
-    ) {
-      sessionStorage.removeItem('binino_session_active');
-      alert("Session data was lost on refresh — please reconnect.");
-      navigate('/', { replace: true });
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      const sessionActive = sessionStorage.getItem('binino_session_active');
+      if (
+        (location.pathname === '/dashboard' || location.pathname === '/explorer') &&
+        sessionActive === 'true' &&
+        connectionStatus === 'idle' &&
+        flashBuffer === null
+      ) {
+        sessionStorage.removeItem('binino_session_active');
+        alert("Session data was lost on refresh — please reconnect.");
+        navigate('/', { replace: true });
+      }
     }
   }, [location.pathname, connectionStatus, flashBuffer, navigate]);
 

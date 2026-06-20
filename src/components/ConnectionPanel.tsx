@@ -13,7 +13,7 @@ interface ConnectionPanelProps {
   setSelectedArch: (arch: string) => void;
   selectedBaud: number;
   setSelectedBaud: (baud: number) => void;
-  connect: () => Promise<void>;
+  connect: (selectedPort?: SerialPort) => Promise<void>;
   disconnect: () => Promise<void>;
   
   // Phase 2 extraction props
@@ -61,8 +61,30 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   const isConnected = connectionStatus === 'connected';
   const isConnecting = connectionStatus === 'connecting';
 
-  const { detectStatus, detectionMessage, resetAllPipelineState, appendLog } = useAppContext();
+  const { detectStatus, detectionMessage, resetAllPipelineState, appendLog, authorizedPorts } = useAppContext();
   const [mcuList, setMcuList] = useState<Record<string, MCUProfile>>(MCU_REGISTRY);
+  const [selectedPortIndex, setSelectedPortIndex] = useState<number>(-1);
+
+  // Synchronize selection when ports list changes
+  useEffect(() => {
+    if (authorizedPorts && authorizedPorts.length > 0) {
+      if (selectedPortIndex === -1 || selectedPortIndex >= authorizedPorts.length) {
+        setSelectedPortIndex(0);
+      }
+    } else {
+      setSelectedPortIndex(-1);
+    }
+  }, [authorizedPorts, selectedPortIndex]);
+
+  const getPortDisplayName = (port: SerialPort, index: number) => {
+    const info = port.getInfo();
+    if (info.usbVendorId !== undefined || info.usbProductId !== undefined) {
+      const vendorHex = info.usbVendorId ? `0x${info.usbVendorId.toString(16).toUpperCase().padStart(4, '0')}` : 'Unknown';
+      const productHex = info.usbProductId ? `0x${info.usbProductId.toString(16).toUpperCase().padStart(4, '0')}` : 'Unknown';
+      return `Port ${index + 1} (VID: ${vendorHex}, PID: ${productHex})`;
+    }
+    return `Generic Port ${index + 1}`;
+  };
 
   // Fetch MCU registry dynamically from backend, fall back to local import on error
   useEffect(() => {
@@ -266,6 +288,33 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
               </div>
             )}
 
+            {/* Serial Port Selector */}
+            {isBrowserSupported && !isDemoMode && (
+              <div className="flex flex-col space-y-1.5">
+                <label htmlFor="port-select" className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  Target Serial Port
+                </label>
+                <select
+                  id="port-select"
+                  value={selectedPortIndex}
+                  onChange={(e) => setSelectedPortIndex(Number(e.target.value))}
+                  disabled={isConnected || isConnecting}
+                  className="w-full h-9 px-3 py-1.5 rounded text-xs font-sans text-[#F0F0F0] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 focus:outline-none"
+                  style={{
+                    backgroundColor: 'var(--bg-inset)',
+                    border: '1px solid var(--border-default)',
+                  }}
+                >
+                  {authorizedPorts && authorizedPorts.map((port, idx) => (
+                    <option key={idx} value={idx}>
+                      {getPortDisplayName(port, idx)}
+                    </option>
+                  ))}
+                  <option value={-1}>+ Authorize New Port...</option>
+                </select>
+              </div>
+            )}
+
             {/* Baud Rate Selector */}
             <div className="flex flex-col space-y-1.5">
               <label htmlFor="baud-select" className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
@@ -316,7 +365,13 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
                 </button>
               ) : (
                 <button
-                  onClick={connect}
+                  onClick={() => {
+                    if (selectedPortIndex >= 0 && authorizedPorts && selectedPortIndex < authorizedPorts.length) {
+                      connect(authorizedPorts[selectedPortIndex]);
+                    } else {
+                      connect();
+                    }
+                  }}
                   disabled={isConnecting}
                   className="w-full h-9 flex items-center justify-center space-x-2 text-xs font-semibold rounded disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150"
                   style={{

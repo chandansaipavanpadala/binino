@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ExtractionStatus } from '../hooks/useFlashExtractor';
-import { ChevronDown, ChevronUp, Binary, Lock } from 'lucide-react';
+import { ChevronDown, ChevronUp, Binary } from 'lucide-react';
 
 interface HexPreviewStripProps {
   liveBuffer: Uint8Array;
@@ -16,15 +16,15 @@ export const HexPreviewStrip: React.FC<HexPreviewStripProps> = ({
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [previewMode, setPreviewMode] = useState<'live' | 'flash'>('live');
 
-  // Hex preview is locked until extraction completes
-  const isLocked = extractionStatus !== 'done';
+  const isExtracting = extractionStatus === 'syncing' || extractionStatus === 'reading';
 
-  // Force collapse if locked (e.g. during an active extraction run)
+  // Auto-switch to Flash mode and expand view when extraction starts
   useEffect(() => {
-    if (isLocked) {
-      setIsExpanded(false);
+    if (isExtracting) {
+      setPreviewMode('flash');
+      setIsExpanded(true);
     }
-  }, [isLocked]);
+  }, [isExtracting]);
 
   // Select active buffer based on mode selection
   const buffer = previewMode === 'live' ? liveBuffer : (flashBuffer || new Uint8Array(0));
@@ -87,36 +87,27 @@ export const HexPreviewStrip: React.FC<HexPreviewStripProps> = ({
       style={{ border: '1px solid var(--border-subtle)' }}
     >
       {/* Toggle Bar */}
-      <button
+      <div
         onClick={() => {
-          if (!isLocked) {
-            setIsExpanded(!isExpanded);
-          }
+          setIsExpanded(!isExpanded);
         }}
-        disabled={isLocked}
-        className={`w-full flex flex-col sm:flex-row sm:items-center justify-between px-4 py-2.5 transition-all duration-200 space-y-2 sm:space-y-0 ${
-          isLocked ? 'opacity-60 cursor-not-allowed' : 'hover:bg-[#1A1A1A]'
-        }`}
+        className="w-full flex flex-col sm:flex-row sm:items-center justify-between px-4 py-2.5 transition-all duration-200 space-y-2 sm:space-y-0 hover:bg-[#1A1A1A] cursor-pointer"
         style={{ 
           backgroundColor: 'var(--bg-surface)',
           borderBottom: isExpanded ? '1px solid var(--border-subtle)' : 'none'
         }}
-        title={isLocked ? "HEX Buffer Preview is locked until firmware extraction completes" : "Toggle HEX Buffer Preview"}
+        title="Toggle HEX Buffer Preview"
       >
         <div className="flex flex-wrap items-center gap-2">
-          {isLocked ? (
-            <Lock className="h-3.5 w-3.5 text-amber-500/80" />
-          ) : (
-            <Binary className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
-          )}
+          <Binary className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
           <span 
             className="text-xs font-semibold tracking-wider uppercase flex items-center" 
-            style={{ color: isLocked ? 'var(--text-muted)' : 'var(--text-secondary)' }}
+            style={{ color: 'var(--text-secondary)' }}
           >
             HEX Buffer Preview
-            {isLocked && (
-              <span className="text-[9px] text-amber-500/70 lowercase font-mono font-normal normal-case italic ml-2">
-                (locked during extraction)
+            {isExtracting && (
+              <span className="text-[9px] text-amber-500/70 lowercase font-mono font-normal normal-case italic ml-2 animate-pulse">
+                (extracting firmware...)
               </span>
             )}
           </span>
@@ -124,9 +115,8 @@ export const HexPreviewStrip: React.FC<HexPreviewStripProps> = ({
             className="text-[9px] font-mono px-2 py-0.5 rounded-full"
             style={{ 
               backgroundColor: 'var(--bg-inset)', 
-              color: isLocked ? 'var(--text-muted)' : 'var(--accent)',
-              border: '1px solid var(--border-subtle)',
-              opacity: isLocked ? 0.6 : 1
+              color: 'var(--accent)',
+              border: '1px solid var(--border-subtle)'
             }}
           >
             {buffer.length} bytes
@@ -138,15 +128,15 @@ export const HexPreviewStrip: React.FC<HexPreviewStripProps> = ({
             style={{ 
               backgroundColor: 'var(--bg-inset)',
               border: '1px solid var(--border-subtle)',
-              opacity: isLocked ? 0.5 : 1
+              opacity: isExtracting ? 0.5 : 1
             }}
           >
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                if (!isLocked) setPreviewMode('live');
+                if (!isExtracting) setPreviewMode('live');
               }}
-              disabled={isLocked}
+              disabled={isExtracting}
               className="px-2 py-0.5 text-[9px] font-sans font-bold tracking-wider uppercase rounded transition-all duration-150 disabled:cursor-not-allowed"
               style={{
                 backgroundColor: previewMode === 'live' ? 'var(--bg-elevated)' : 'transparent',
@@ -158,39 +148,33 @@ export const HexPreviewStrip: React.FC<HexPreviewStripProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                if (!isLocked) setPreviewMode('flash');
+                if (!isExtracting) setPreviewMode('flash');
               }}
-              disabled={isLocked || extractionStatus !== 'done'}
+              disabled={isExtracting || (!flashBuffer && extractionStatus !== 'done')}
               className="px-2 py-0.5 text-[9px] font-sans font-bold tracking-wider uppercase rounded transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed"
               style={{
                 backgroundColor: previewMode === 'flash' ? 'var(--bg-elevated)' : 'transparent',
                 color: previewMode === 'flash' ? 'var(--text-primary)' : 'var(--text-muted)'
               }}
-              title={extractionStatus !== 'done' ? 'Dump firmware first to unlock' : 'View full dump'}
+              title={(!flashBuffer && extractionStatus !== 'done') ? 'Dump firmware first to unlock' : 'View full dump'}
             >
               Flash
             </button>
           </div>
         </div>
         <div className="flex items-center space-x-2 self-end sm:self-auto">
-          {isLocked ? (
-            <span className="text-[9px] font-mono uppercase tracking-wider text-amber-500/70">Locked</span>
+          {isExpanded && (
+            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              {previewMode === 'live' ? 'Showing last 1KB' : 'Showing last 4KB'}
+            </span>
+          )}
+          {isExpanded ? (
+            <ChevronUp className="h-4 w-4" style={{ color: 'var(--text-secondary)' }} />
           ) : (
-            <>
-              {isExpanded && (
-                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                  {previewMode === 'live' ? 'Showing last 1KB' : 'Showing last 4KB'}
-                </span>
-              )}
-              {isExpanded ? (
-                <ChevronUp className="h-4 w-4" style={{ color: 'var(--text-secondary)' }} />
-              ) : (
-                <ChevronDown className="h-4 w-4" style={{ color: 'var(--text-secondary)' }} />
-              )}
-            </>
+            <ChevronDown className="h-4 w-4" style={{ color: 'var(--text-secondary)' }} />
           )}
         </div>
-      </button>
+      </div>
 
       {/* HEX Content Panel */}
       <div 
@@ -205,23 +189,10 @@ export const HexPreviewStrip: React.FC<HexPreviewStripProps> = ({
           className="p-4 h-64 overflow-y-auto font-mono text-[10px] leading-5 select-text"
           style={{ backgroundColor: 'var(--bg-inset)' }}
         >
-          {extractionStatus === 'syncing' || extractionStatus === 'reading' ? (
-            <div className="space-y-2 py-2 animate-pulse select-none">
-              <div 
-                className="select-none pb-1 mb-2 flex text-[9px] font-sans font-bold"
-                style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}
-              >
-                <span className="inline-block w-24">OFFSET</span>
-                <span className="inline-block flex-1">00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F</span>
-                <span className="inline-block w-32 pl-4">ASCII PREVIEW</span>
-              </div>
-              {Array.from({ length: 8 }).map((_, idx) => (
-                <div key={idx} className="flex items-center gap-4">
-                  <div className="h-3 w-16 rounded" style={{ backgroundColor: 'var(--bg-elevated)' }}></div>
-                  <div className="h-3 flex-1 rounded" style={{ backgroundColor: 'var(--bg-elevated)' }}></div>
-                  <div className="h-3 w-28 rounded" style={{ backgroundColor: 'var(--bg-elevated)' }}></div>
-                </div>
-              ))}
+          {isExtracting && buffer.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full space-y-1 font-sans animate-pulse" style={{ color: 'var(--text-muted)' }}>
+              <span className="font-semibold text-amber-500">Syncing with bootloader...</span>
+              <span className="text-[10px] font-mono">Establishing connection bridge...</span>
             </div>
           ) : buffer.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full space-y-1 font-sans" style={{ color: 'var(--text-muted)' }}>

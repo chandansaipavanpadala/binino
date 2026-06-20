@@ -5,7 +5,7 @@ import { useFlashExtractor } from '../hooks/useFlashExtractor';
 import { useBackendHandoff } from '../hooks/useBackendHandoff';
 import { useSmartDetect, DetectStatus, Confidence, RecommendedAction, FilesystemCommands } from '../hooks/useSmartDetect';
 import { useAIExplain, ExplainStatus } from '../hooks/useAIExplain';
-import { FileNode } from '../components/FileBrowser/FileTree';
+
 import type { AnalysisResult } from '../types/analysis';
 import type { ConnectionStatus, TerminalLog, PortMetadata } from '../hooks/useSerialPort';
 import type { ExtractionStatus } from '../hooks/useFlashExtractor';
@@ -27,7 +27,7 @@ interface AppContextValue {
   terminalLogs: TerminalLog[];
   setTerminalLogs: (logs: TerminalLog[]) => void;
   hexBuffer: Uint8Array;
-  connect: () => Promise<void>;
+  connect: (selectedPort?: SerialPort) => Promise<void>;
   disconnect: () => Promise<void>;
   clearLogs: () => void;
   isBrowserSupported: boolean;
@@ -35,6 +35,8 @@ interface AppContextValue {
   appendLog: (level: TerminalLog['level'], message: string) => void;
   pauseReadLoop: () => Promise<void>;
   resumeReadLoop: () => void;
+  authorizedPorts: SerialPort[];
+  updateAuthorizedPorts: () => Promise<void>;
 
   // Extraction
   extractionStatus: ExtractionStatus;
@@ -82,13 +84,7 @@ interface AppContextValue {
   isExplorerOpen: boolean;
   setIsExplorerOpen: (v: boolean) => void;
 
-  // File Browser lifted states
-  fileList: FileNode[];
-  setFileList: React.Dispatch<React.SetStateAction<FileNode[]>>;
-  selectedFile: FileNode | null;
-  setSelectedFile: React.Dispatch<React.SetStateAction<FileNode | null>>;
-  selectedFileContent: string | null;
-  setSelectedFileContent: React.Dispatch<React.SetStateAction<string | null>>;
+
 
   // AI Explain lifted states
   explainStatus: ExplainStatus;
@@ -119,10 +115,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isExplorerOpen, setIsExplorerOpen] = useState(false);
   const [forceBinaryExtraction, setForceBinaryExtraction] = useState(false);
 
-  // File browser lifted states
-  const [fileList, setFileList] = useState<FileNode[]>([]);
-  const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
-  const [selectedFileContent, setSelectedFileContent] = useState<string | null>(null);
+
 
   // Workflow Stage state
   const [workflowStage, setWorkflowStage] = useState<string>('bridge');
@@ -133,12 +126,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Setup disconnect callback ref to break circular dependency with serial port hook
   const onDisconnectRef = useRef<(() => void) | null>(null);
 
-  const serial = useSerialPort({
-    onDisconnect: () => {
-      if (onDisconnectRef.current) {
-        onDisconnectRef.current();
-      }
+  const handleDisconnect = useCallback(() => {
+    if (onDisconnectRef.current) {
+      onDisconnectRef.current();
     }
+  }, []);
+
+  const serial = useSerialPort({
+    onDisconnect: handleDisconnect
   });
 
   const smartDetect = useSmartDetect();
@@ -166,27 +161,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isDemoMode,
   });
 
+  // Destructure stable callbacks to prevent infinite re-rendering loops in route guards
+  const { setHexBuffer, appendLog } = serial;
+  const { resetDetection } = smartDetect;
+  const { resetExtraction } = extraction;
+  const { resetHandoff } = handoff;
+  const { clearExplanation } = aiExplain;
+
   // Central reset function
   const resetAllPipelineState = useCallback(() => {
     // 1. Clear raw bytes hexBuffer
-    serial.setHexBuffer(new Uint8Array(0));
+    setHexBuffer(new Uint8Array(0));
 
     // 2. Clear smart detect
-    smartDetect.resetDetection();
+    resetDetection();
 
     // 3. Clear extraction states
-    extraction.resetExtraction();
+    resetExtraction();
 
     // 4. Clear handoff decompiler and event streams
-    handoff.resetHandoff();
+    resetHandoff();
 
     // 5. Clear AI Explain timers
-    aiExplain.clearExplanation();
+    clearExplanation();
 
-    // 6. Clear File Browser
-    setFileList([]);
-    setSelectedFile(null);
-    setSelectedFileContent(null);
+
 
     // 7. Close Code Explorer
     setIsExplorerOpen(false);
@@ -198,11 +197,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setForceBinaryExtraction(false);
 
     // 10. Append separator to terminal logs
-    serial.appendLog('INFO', '─── Session cleared ───');
+    appendLog('INFO', '─── Session cleared ───');
 
     // 11. Clear session storage active flag
     sessionStorage.removeItem('binino_session_active');
-  }, [serial, smartDetect, extraction, handoff, aiExplain]);
+  }, [setHexBuffer, appendLog, resetDetection, resetExtraction, resetHandoff, clearExplanation]);
 
   // Sync ref callback
   useEffect(() => {
@@ -210,9 +209,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [resetAllPipelineState]);
 
   // Wrap connect to reset state first
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (selectedPort?: SerialPort) => {
     resetAllPipelineState();
-    await serial.connect();
+    await serial.connect(selectedPort);
   }, [serial, resetAllPipelineState]);
 
   // Automatically trigger smart detection on connection
@@ -314,13 +313,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isExplorerOpen,
     setIsExplorerOpen,
 
-    // File Browser
-    fileList,
-    setFileList,
-    selectedFile,
-    setSelectedFile,
-    selectedFileContent,
-    setSelectedFileContent,
+
 
     // AI Explain
     explainStatus: aiExplain.explainStatus,

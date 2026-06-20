@@ -28,6 +28,7 @@ export const useSerialPort = ({ onDisconnect }: UseSerialPortProps = {}) => {
   const [portInfo, setPortInfo] = useState<PortMetadata | null>(null);
   const [connectionTimestamp, setConnectionTimestamp] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [authorizedPorts, setAuthorizedPorts] = useState<SerialPort[]>([]);
   
   // Data buffers
   const [terminalLogs, setTerminalLogs] = useState<TerminalLog[]>([]);
@@ -39,6 +40,32 @@ export const useSerialPort = ({ onDisconnect }: UseSerialPortProps = {}) => {
   const retryCountRef = useRef<number>(0);
   const isReadingRef = useRef<boolean>(false);
   const pauseCountRef = useRef<number>(0);
+
+  // Helper to query and update authorized ports
+  const updateAuthorizedPorts = useCallback(async () => {
+    if (typeof window !== 'undefined' && 'serial' in navigator && navigator.serial.getPorts) {
+      try {
+        const ports = await navigator.serial.getPorts();
+        setAuthorizedPorts(ports);
+      } catch (err) {
+        console.warn('Failed to retrieve authorized serial ports:', err);
+      }
+    }
+  }, []);
+
+  // Sync authorized ports list with serial connect/disconnect events
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serial' in navigator) {
+      updateAuthorizedPorts();
+      navigator.serial.addEventListener('connect', updateAuthorizedPorts);
+      navigator.serial.addEventListener('disconnect', updateAuthorizedPorts);
+      return () => {
+        navigator.serial.removeEventListener('connect', updateAuthorizedPorts);
+        navigator.serial.removeEventListener('disconnect', updateAuthorizedPorts);
+      };
+    }
+    return undefined;
+  }, [updateAuthorizedPorts]);
 
 
 
@@ -131,10 +158,9 @@ export const useSerialPort = ({ onDisconnect }: UseSerialPortProps = {}) => {
     appendLog('INFO', 'Starting serial data stream listener...');
 
     while (isReadingRef.current && port.readable) {
+      const reader = port.readable.getReader();
+      readerRef.current = reader;
       try {
-        const reader = port.readable.getReader();
-        readerRef.current = reader;
-        
         // Reset retry count upon successful read initialization
         retryCountRef.current = 0;
 
@@ -174,14 +200,6 @@ export const useSerialPort = ({ onDisconnect }: UseSerialPortProps = {}) => {
             
             // Brief delay before retry
             await new Promise((resolve) => setTimeout(resolve, 500));
-            
-            // Release lock and retry the loop
-            if (readerRef.current) {
-              try {
-                readerRef.current.releaseLock();
-              } catch (_) {}
-              readerRef.current = null;
-            }
             continue;
           } else {
             appendLog('ERROR', `Fatal read failure: ${err.message || 'Unknown device error'}`);
@@ -189,6 +207,13 @@ export const useSerialPort = ({ onDisconnect }: UseSerialPortProps = {}) => {
           }
         }
         break;
+      } finally {
+        try {
+          reader.releaseLock();
+        } catch (_) {}
+        if (readerRef.current === reader) {
+          readerRef.current = null;
+        }
       }
     }
     
@@ -196,7 +221,7 @@ export const useSerialPort = ({ onDisconnect }: UseSerialPortProps = {}) => {
   }, [appendLog, disconnect]);
 
   // Connect function
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (selectedPort?: SerialPort) => {
     if (!isBrowserSupported) {
       setErrorMsg('Web Serial API is not supported in this browser. Please use Chrome, Edge, or Opera.');
       setConnectionStatus('error');
@@ -210,8 +235,12 @@ export const useSerialPort = ({ onDisconnect }: UseSerialPortProps = {}) => {
 
     let port: SerialPort | null = null;
     try {
-      // Prompt user to select port
-      port = await navigator.serial.requestPort();
+      if (selectedPort) {
+        port = selectedPort;
+      } else {
+        // Prompt user to select port
+        port = await navigator.serial.requestPort();
+      }
     } catch (err: any) {
       // Permission denied or dialog canceled
       const errMsg = err.message || '';
@@ -254,6 +283,7 @@ export const useSerialPort = ({ onDisconnect }: UseSerialPortProps = {}) => {
       setConnectionStatus('connected');
       setConnectionTimestamp(getFormattedTime());
       appendLog('INFO', `Connection established. Hardware bridge active.`);
+      updateAuthorizedPorts();
 
       // Start asynchronous read loop
       startReadLoop(port);
@@ -273,7 +303,7 @@ export const useSerialPort = ({ onDisconnect }: UseSerialPortProps = {}) => {
       await cleanupPort();
       setConnectionStatus('error');
     }
-  }, [isBrowserSupported, selectedArch, selectedBaud, appendLog, startReadLoop, cleanupPort]);
+  }, [isBrowserSupported, selectedArch, selectedBaud, appendLog, startReadLoop, cleanupPort, updateAuthorizedPorts]);
 
   // Temporarily suspends the background serial reader loop
   const pauseReadLoop = useCallback(async () => {
@@ -288,12 +318,6 @@ export const useSerialPort = ({ onDisconnect }: UseSerialPortProps = {}) => {
       } catch (err) {
         console.warn('Error cancelling reader in pause:', err);
       }
-      try {
-        readerRef.current.releaseLock();
-      } catch (err) {
-        console.warn('Error releasing lock in pause:', err);
-      }
-      readerRef.current = null;
     }
   }, []);
 
@@ -359,6 +383,8 @@ export const useSerialPort = ({ onDisconnect }: UseSerialPortProps = {}) => {
     appendLog,
     pauseReadLoop,
     resumeReadLoop,
+    authorizedPorts,
+    updateAuthorizedPorts,
   };
 };
 

@@ -19,6 +19,25 @@ const MOCK_FILES: Record<string, string> = {
   '/boot.js': `// boot.js -- Espruino startup handler\r\nE.on('init', function() {\r\n  console.log("System initialized.");\r\n});\r\n`
 };
 
+const readWithTimeout = async (
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  timeoutMs: number
+): Promise<{ value: Uint8Array | undefined; done: boolean }> => {
+  let timer: any;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Timeout waiting for serial read')), timeoutMs);
+  });
+
+  try {
+    const result = await Promise.race([reader.read(), timeoutPromise]);
+    clearTimeout(timer);
+    return result;
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+};
+
 // Helper to query directory tree recursively over Web Serial CDC link
 const queryFilesystemOverSerial = async (
   port: SerialPort,
@@ -28,32 +47,44 @@ const queryFilesystemOverSerial = async (
   if (!port.writable || !port.readable) {
     throw new Error('Serial port streams are not available.');
   }
-  const writer = port.writable.getWriter();
-  const reader = port.readable.getReader();
+
+  let writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
+  let hasReaderError = false;
   
   const rName = runtime.toLowerCase();
   
   try {
+    writer = port.writable.getWriter();
+    reader = port.readable.getReader();
+
     if (rName === 'micropython' || rName === 'circuitpython') {
-      // 1. Enter Raw REPL (Ctrl+A)
-      await writer.write(encoder.encode('\r\n\x01'));
+      // 1. Interrupt any running script with Ctrl+C first, wait 150ms, then enter Raw REPL (Ctrl+A)
+      await writer.write(encoder.encode('\r\n\x03\r\n'));
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      await writer.write(encoder.encode('\x01'));
       
       // Wait for Raw REPL prompt (500ms max)
       let buffer = '';
       let useRawRepl = false;
       const startTime = Date.now();
-      while (Date.now() - startTime < 500) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (value) {
-          buffer += decoder.decode(value);
-          if (buffer.includes('raw REPL; ready') || buffer.includes('>')) {
-            useRawRepl = true;
-            break;
+      try {
+        while (Date.now() - startTime < 1000) {
+          const { value, done } = await readWithTimeout(reader, 300);
+          if (done) break;
+          if (value) {
+            buffer += decoder.decode(value);
+            if (buffer.includes('raw REPL; ready') || buffer.includes('>')) {
+              useRawRepl = true;
+              break;
+            }
           }
         }
+      } catch (err) {
+        // Non-fatal raw REPL wait timeout, fallback to interactive REPL is supported
+        console.warn('[Filesystem] Wait for Raw REPL timed out:', err);
       }
       
       if (useRawRepl) {
@@ -76,7 +107,7 @@ def list_dir(d):
         r.append({'name':e,'path':p,'type':'file','size':os.stat(p)[6] if len(os.stat(p))>6 else 0})
   except: pass
   return r
-print('\\x00BININO_FS_START\\x00' + json.dumps(list_dir('/')) + '\\x00BININO_FS_END\\x00')
+print('---BININO_FS_START---' + json.dumps(list_dir('/')) + '---BININO_FS_END---')
 `;
         await writer.write(encoder.encode(listScript + '\x04')); // Ctrl+D to execute
       } else {
@@ -87,23 +118,28 @@ print('\\x00BININO_FS_START\\x00' + json.dumps(list_dir('/')) + '\\x00BININO_FS_
         await new Promise(r => setTimeout(r, 100));
 
         // Send single-line script to standard REPL
-        const singleLine = "import os, json; r=[]; [r.append({'name':e,'path':'/'+e,'type':'directory' if (os.stat('/'+e)[0]&0x4000) else 'file','size':os.stat('/'+e)[6]}) for e in os.listdir('/')]; print('\\x00BININO_FS_START\\x00' + json.dumps(r) + '\\x00BININO_FS_END\\x00')\r\n";
+        const singleLine = "import os, json; r=[]; [r.append({'name':e,'path':'/'+e,'type':'directory' if (os.stat('/'+e)[0]&0x4000) else 'file','size':os.stat('/'+e)[6]}) for e in os.listdir('/')]; print('---BININO_FS_START---' + json.dumps(r) + '---BININO_FS_END---')\r\n";
         await writer.write(encoder.encode(singleLine));
       }
       
       // 3. Read output
       buffer = '';
-      const endMarker = '\x00BININO_FS_END\x00';
+      const endMarker = '---BININO_FS_END---';
       const readStartTime = Date.now();
-      while (Date.now() - readStartTime < 4000) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (value) {
-          buffer += decoder.decode(value);
-          if (buffer.includes(endMarker)) {
-            break;
+      try {
+        while (Date.now() - readStartTime < 4000) {
+          const { value, done } = await readWithTimeout(reader, 1000);
+          if (done) break;
+          if (value) {
+            buffer += decoder.decode(value);
+            if (buffer.includes(endMarker)) {
+              break;
+            }
           }
         }
+      } catch (err) {
+        hasReaderError = true;
+        console.warn('[Filesystem] Timeout or error reading file tree:', err);
       }
       
       if (useRawRepl) {
@@ -112,7 +148,7 @@ print('\\x00BININO_FS_START\\x00' + json.dumps(list_dir('/')) + '\\x00BININO_FS_
       }
       
       // Extract contents
-      const startMarker = '\x00BININO_FS_START\x00';
+      const startMarker = '---BININO_FS_START---';
       const startIdx = buffer.indexOf(startMarker);
       const endIdx = buffer.indexOf(endMarker);
       if (startIdx !== -1 && endIdx !== -1) {
@@ -122,25 +158,30 @@ print('\\x00BININO_FS_START\\x00' + json.dumps(list_dir('/')) + '\\x00BININO_FS_
     } 
     else if (rName === 'nodemcu' || rName === 'lua') {
       const luaScript = `
-local t={} for k,v in pairs(file.list()) do t[#t+1]=k..":"..tostring(v) end print("\\x00BININO_FS_START\\x00\\n"..table.concat(t,"\\n").."\\n\\x00BININO_FS_END\\x00")
+local t={} for k,v in pairs(file.list()) do t[#t+1]=k..":"..tostring(v) end print("---BININO_FS_START---\\n"..table.concat(t,"\\n").."\\n---BININO_FS_END---")
 \r\n`;
       await writer.write(encoder.encode(luaScript));
       
       let buffer = '';
-      const endMarker = '\x00BININO_FS_END\x00';
+      const endMarker = '---BININO_FS_END---';
       const readStartTime = Date.now();
-      while (Date.now() - readStartTime < 3000) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (value) {
-          buffer += decoder.decode(value);
-          if (buffer.includes(endMarker)) {
-            break;
+      try {
+        while (Date.now() - readStartTime < 3000) {
+          const { value, done } = await readWithTimeout(reader, 1000);
+          if (done) break;
+          if (value) {
+            buffer += decoder.decode(value);
+            if (buffer.includes(endMarker)) {
+              break;
+            }
           }
         }
+      } catch (err) {
+        hasReaderError = true;
+        console.warn('[Filesystem] Lua read timeout:', err);
       }
       
-      const startMarker = '\x00BININO_FS_START\x00';
+      const startMarker = '---BININO_FS_START---';
       const startIdx = buffer.indexOf(startMarker);
       const endIdx = buffer.indexOf(endMarker);
       if (startIdx !== -1 && endIdx !== -1) {
@@ -193,26 +234,31 @@ local t={} for k,v in pairs(file.list()) do t[#t+1]=k..":"..tostring(v) end prin
       }
     }
   }
-  print("\\x00BININO_FS_START\\x00" + JSON.stringify(files) + "\\x00BININO_FS_END\\x00");
+  print("---BININO_FS_START---" + JSON.stringify(files) + "---BININO_FS_END---");
 })()
 \r\n`;
       await writer.write(encoder.encode(jsScript));
       
       let buffer = '';
-      const endMarker = '\x00BININO_FS_END\x00';
+      const endMarker = '---BININO_FS_END---';
       const readStartTime = Date.now();
-      while (Date.now() - readStartTime < 3000) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (value) {
-          buffer += decoder.decode(value);
-          if (buffer.includes(endMarker)) {
-            break;
+      try {
+        while (Date.now() - readStartTime < 3000) {
+          const { value, done } = await readWithTimeout(reader, 1000);
+          if (done) break;
+          if (value) {
+            buffer += decoder.decode(value);
+            if (buffer.includes(endMarker)) {
+              break;
+            }
           }
         }
+      } catch (err) {
+        hasReaderError = true;
+        console.warn('[Filesystem] Espruino read timeout:', err);
       }
       
-      const startMarker = '\x00BININO_FS_START\x00';
+      const startMarker = '---BININO_FS_START---';
       const startIdx = buffer.indexOf(startMarker);
       const endIdx = buffer.indexOf(endMarker);
       if (startIdx !== -1 && endIdx !== -1) {
@@ -245,13 +291,47 @@ local t={} for k,v in pairs(file.list()) do t[#t+1]=k..":"..tostring(v) end prin
   } catch (err) {
     console.error('Error querying directory tree over serial:', err);
   } finally {
-    try { writer.releaseLock(); } catch (_) {}
-    try {
-      await reader.cancel();
-      reader.releaseLock();
-    } catch (_) {}
+    if (writer) {
+      try { writer.releaseLock(); } catch (_) {}
+    }
+    if (reader) {
+      try {
+        if (hasReaderError) {
+          await reader.cancel();
+        }
+        reader.releaseLock();
+      } catch (_) {}
+    }
   }
   return [];
+};
+
+// Decodes base64 chunked output where intermediate = padding exists per printed chunk
+const decodeChunkedBase64 = (accumulatedBase64: string): string => {
+  const chunks = accumulatedBase64.split(/[\r\n]+/);
+  const binaryParts: Uint8Array[] = chunks.map(chunk => {
+    const clean = chunk.replace(/[\r\n\s]/g, '').replace(/[^A-Za-z0-9+/=]/g, '');
+    if (!clean) return new Uint8Array(0);
+    try {
+      const binaryStr = window.atob(clean);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      return bytes;
+    } catch (err) {
+      console.warn('[Filesystem] Skipping invalid base64 line:', chunk, err);
+      return new Uint8Array(0);
+    }
+  });
+  const totalLen = binaryParts.reduce((sum, b) => sum + b.length, 0);
+  const combined = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const part of binaryParts) {
+    combined.set(part, offset);
+    offset += part.length;
+  }
+  return new TextDecoder('utf-8').decode(combined);
 };
 
 // Helper to read file contents recursively/securely as Base64 over serial
@@ -264,32 +344,43 @@ const readFileOverSerial = async (
   if (!port.writable || !port.readable) {
     throw new Error('Serial port streams are not available.');
   }
-  const writer = port.writable.getWriter();
-  const reader = port.readable.getReader();
+  
+  let writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
+  let hasReaderError = false;
   
   const rName = runtime.toLowerCase();
   
   try {
+    writer = port.writable!.getWriter();
+    reader = port.readable!.getReader();
+
     if (rName === 'micropython' || rName === 'circuitpython') {
-      // 1. Enter Raw REPL (Ctrl+A)
-      await writer.write(encoder.encode('\r\n\x01'));
+      // 1. Interrupt any running script with Ctrl+C first, wait 150ms, then enter Raw REPL (Ctrl+A)
+      await writer.write(encoder.encode('\r\n\x03\r\n'));
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      await writer.write(encoder.encode('\x01'));
       
-      // Wait for Raw REPL prompt (500ms max)
+      // Wait for Raw REPL prompt (1000ms max)
       let buffer = '';
       let useRawRepl = false;
       const startTime = Date.now();
-      while (Date.now() - startTime < 500) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (value) {
-          buffer += decoder.decode(value);
-          if (buffer.includes('raw REPL; ready') || buffer.includes('>')) {
-            useRawRepl = true;
-            break;
+      try {
+        while (Date.now() - startTime < 1000) {
+          const { value, done } = await readWithTimeout(reader, 300);
+          if (done) break;
+          if (value) {
+            buffer += decoder.decode(value);
+            if (buffer.includes('raw REPL; ready') || buffer.includes('>')) {
+              useRawRepl = true;
+              break;
+            }
           }
         }
+      } catch (_) {
+        // Non-fatal raw REPL wait timeout, fallback to interactive REPL is supported
       }
       
       // Clean path backslashes and escape quotes
@@ -297,19 +388,19 @@ const readFileOverSerial = async (
       
       if (useRawRepl) {
         appendLog('INFO', '[Filesystem] MicroPython: raw REPL mode activated.');
-        // 2. Send python read file script (Base64 wrapper in chunks of 1024 bytes)
+        // 2. Send python read file script (Base64 wrapper printed in chunks with newlines)
         const readScript = `
 import ubinascii, sys
 try:
-  print('\\x00BININO_FILE_START\\x00')
+  print('---BININO_FILE_START---')
   with open('${cleanPath}', 'rb') as f:
     while True:
       chunk = f.read(1024)
       if not chunk: break
-      sys.stdout.write(ubinascii.b2a_base64(chunk).decode('ascii'))
-  print('\\x00BININO_READ_END\\x00')
+      print(ubinascii.b2a_base64(chunk).decode('ascii').strip())
+  print('---BININO_END---')
 except Exception as e:
-  print('\\x00BININO_FILE_START_ERR:\\x00' + str(e) + '\\x00BININO_FILE_END\\x00')
+  print('---BININO_FILE_START_ERR:---' + str(e) + '---BININO_END---')
 `;
         await writer.write(encoder.encode(readScript + '\x04')); // Ctrl+D to execute
       } else {
@@ -320,23 +411,27 @@ except Exception as e:
         await new Promise(r => setTimeout(r, 100));
 
         // Send single-line script to standard REPL
-        const singleLineRead = `import ubinascii, sys; f=open('${cleanPath}', 'rb'); print('\\x00BININO_FILE_START\\x00'); [sys.stdout.write(ubinascii.b2a_base64(chunk).decode('ascii')) for chunk in iter(lambda: f.read(1024), b'')]; print('\\x00BININO_READ_END\\x00'); f.close()\r\n`;
+        const singleLineRead = `import ubinascii, sys; f=open('${cleanPath}', 'rb'); print('---BININO_FILE_START---'); _ = [print(ubinascii.b2a_base64(chunk).decode('ascii').strip()) for chunk in iter(lambda: f.read(1024), b'')]; print('---BININO_END---'); f.close()\r\n`;
         await writer.write(encoder.encode(singleLineRead));
       }
       
       // 3. Read output
       buffer = '';
-      const endMarker = buffer.includes('\x00BININO_READ_END\x00') ? '\x00BININO_READ_END\x00' : '\x00BININO_FILE_END\x00';
       const readStartTime = Date.now();
-      while (Date.now() - readStartTime < 8000) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (value) {
-          buffer += decoder.decode(value);
-          if (buffer.includes(endMarker) || buffer.includes('\x00BININO_FILE_END\x00')) {
-            break;
+      try {
+        while (Date.now() - readStartTime < 8000) {
+          const { value, done } = await readWithTimeout(reader, 1000);
+          if (done) break;
+          if (value) {
+            buffer += decoder.decode(value);
+            if (buffer.includes('---BININO_END---')) {
+              break;
+            }
           }
         }
+      } catch (err) {
+        hasReaderError = true;
+        console.warn('[Filesystem] File read timeout:', err);
       }
       
       if (useRawRepl) {
@@ -344,9 +439,9 @@ except Exception as e:
         await writer.write(encoder.encode('\x02'));
       }
       
-      const startMarker = '\x00BININO_FILE_START\x00';
-      const errMarker = '\x00BININO_FILE_START_ERR:\x00';
-      const errEndMarker = '\x00BININO_FILE_END\x00';
+      const startMarker = '---BININO_FILE_START---';
+      const errMarker = '---BININO_FILE_START_ERR:---';
+      const errEndMarker = '---BININO_END---';
       
       if (buffer.includes(errMarker)) {
         const startIdx = buffer.indexOf(errMarker);
@@ -355,17 +450,15 @@ except Exception as e:
       }
       
       const startIdx = buffer.indexOf(startMarker);
-      const endIdx = buffer.indexOf(endMarker);
+      const endIdx = buffer.indexOf('---BININO_END---');
       if (startIdx !== -1 && endIdx !== -1) {
-        const base64Str = buffer.substring(startIdx + startMarker.length, endIdx).replace(/\s/g, '');
+        const base64Str = buffer.substring(startIdx + startMarker.length, endIdx);
         try {
-          const binaryString = window.atob(base64Str);
-          const len = binaryString.length;
-          const bytes = new Uint8Array(len);
-          for (let i = 0; i < len; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-          return new TextDecoder().decode(bytes);
+          console.log('[Filesystem] useRawRepl:', useRawRepl);
+          console.log('[Filesystem] buffer:', JSON.stringify(buffer));
+          console.log('[Filesystem] startIdx:', startIdx, 'endIdx:', endIdx);
+          console.log('[Filesystem] base64Str length:', base64Str.length);
+          return decodeChunkedBase64(base64Str);
         } catch (e) {
           return `Error: Failed to base64 decode script contents. ${e}`;
         }
@@ -376,37 +469,42 @@ except Exception as e:
       const luaScript = `
 (function()
   if not file.exists("${cleanPath}") then
-    print("\\x00BININO_FILE_START_ERR:\\x00File not found\\x00BININO_FILE_END\\x00")
+    print("---BININO_FILE_START_ERR:---File not found---BININO_END---")
     return
   end
   file.open("${cleanPath}", "r")
   local data = file.read()
   file.close()
   if data then
-    print("\\x00BININO_FILE_START\\x00" .. encoder.toBase64(data) .. "\\x00BININO_FILE_END\\x00")
+    print("---BININO_FILE_START---" .. encoder.toBase64(data) .. "---BININO_END---")
   else
-    print("\\x00BININO_FILE_START\\x00\\x00BININO_FILE_END\\x00")
+    print("---BININO_FILE_START------BININO_END---")
   end
 end)()
 \r\n`;
       await writer.write(encoder.encode(luaScript));
       
       let buffer = '';
-      const endMarker = '\x00BININO_FILE_END\x00';
+      const endMarker = '---BININO_END---';
       const readStartTime = Date.now();
-      while (Date.now() - readStartTime < 3000) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (value) {
-          buffer += decoder.decode(value);
-          if (buffer.includes(endMarker)) {
-            break;
+      try {
+        while (Date.now() - readStartTime < 3000) {
+          const { value, done } = await readWithTimeout(reader, 1000);
+          if (done) break;
+          if (value) {
+            buffer += decoder.decode(value);
+            if (buffer.includes(endMarker)) {
+              break;
+            }
           }
         }
+      } catch (err) {
+        hasReaderError = true;
+        console.warn('[Filesystem] Lua file read timeout:', err);
       }
       
-      const startMarker = '\x00BININO_FILE_START\x00';
-      const errMarker = '\x00BININO_FILE_START_ERR:\x00';
+      const startMarker = '---BININO_FILE_START---';
+      const errMarker = '---BININO_FILE_START_ERR:---';
       if (buffer.includes(errMarker)) {
         return `Error: File ${cleanPath} not found on Lua flash.`;
       }
@@ -414,9 +512,9 @@ end)()
       const startIdx = buffer.indexOf(startMarker);
       const endIdx = buffer.indexOf(endMarker);
       if (startIdx !== -1 && endIdx !== -1) {
-        const base64Str = buffer.substring(startIdx + startMarker.length, endIdx).trim();
+        const base64Str = buffer.substring(startIdx + startMarker.length, endIdx);
         try {
-          return window.atob(base64Str);
+          return decodeChunkedBase64(base64Str);
         } catch (e) {
           return `Error: Base64 decode failed. ${e}`;
         }
@@ -428,30 +526,35 @@ end)()
 (function() {
   var content = require("Storage").read("${cleanPath}");
   if (content === undefined) {
-    print("\\x00BININO_FILE_START_ERR:\\x00File not found\\x00BININO_FILE_END\\x00");
+    print("---BININO_FILE_START_ERR:---File not found---BININO_END---");
   } else {
-    print("\\x00BININO_FILE_START\\x00" + btoa(content) + "\\x00BININO_FILE_END\\x00");
+    print("---BININO_FILE_START---" + btoa(content) + "---BININO_END---");
   }
 })()
 \r\n`;
       await writer.write(encoder.encode(jsScript));
       
       let buffer = '';
-      const endMarker = '\x00BININO_FILE_END\x00';
+      const endMarker = '---BININO_END---';
       const readStartTime = Date.now();
-      while (Date.now() - readStartTime < 3000) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (value) {
-          buffer += decoder.decode(value);
-          if (buffer.includes(endMarker)) {
-            break;
+      try {
+        while (Date.now() - readStartTime < 3000) {
+          const { value, done } = await readWithTimeout(reader, 1000);
+          if (done) break;
+          if (value) {
+            buffer += decoder.decode(value);
+            if (buffer.includes(endMarker)) {
+              break;
+            }
           }
         }
+      } catch (err) {
+        hasReaderError = true;
+        console.warn('[Filesystem] Espruino file read timeout:', err);
       }
       
-      const startMarker = '\x00BININO_FILE_START\x00';
-      const errMarker = '\x00BININO_FILE_START_ERR:\x00';
+      const startMarker = '---BININO_FILE_START---';
+      const errMarker = '---BININO_FILE_START_ERR:---';
       if (buffer.includes(errMarker)) {
         return `Error: File ${cleanPath} not found in Espruino Storage.`;
       }
@@ -459,9 +562,9 @@ end)()
       const startIdx = buffer.indexOf(startMarker);
       const endIdx = buffer.indexOf(endMarker);
       if (startIdx !== -1 && endIdx !== -1) {
-        const base64Str = buffer.substring(startIdx + startMarker.length, endIdx).trim();
+        const base64Str = buffer.substring(startIdx + startMarker.length, endIdx);
         try {
-          return window.atob(base64Str);
+          return decodeChunkedBase64(base64Str);
         } catch (e) {
           return `Error: Base64 decode failed. ${e}`;
         }
@@ -471,11 +574,17 @@ end)()
     console.error('Error reading file over serial:', err);
     return `Error reading file: ${err}`;
   } finally {
-    try { writer.releaseLock(); } catch (_) {}
-    try {
-      await reader.cancel();
-      reader.releaseLock();
-    } catch (_) {}
+    if (writer) {
+      try { writer.releaseLock(); } catch (_) {}
+    }
+    if (reader) {
+      try {
+        if (hasReaderError) {
+          await reader.cancel();
+        }
+        reader.releaseLock();
+      } catch (_) {}
+    }
   }
   return '';
 };
@@ -490,13 +599,11 @@ export const FileBrowser: React.FC = () => {
     pauseReadLoop,
     resumeReadLoop,
     isDemoMode,
-    fileList: files,
-    setFileList: setFiles,
-    selectedFile,
-    setSelectedFile,
-    selectedFileContent: fileContent,
-    setSelectedFileContent: setFileContent
   } = useAppContext();
+
+  const [files, setFiles] = useState<FileNode[]>([]);
+  const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
+  const [fileContent, setFileContent] = useState<string>('');
 
   const [activeTab, setActiveTab] = useState<'files' | 'repl'>('files');
   const [loadingFiles, setLoadingFiles] = useState(false);
@@ -553,6 +660,7 @@ export const FileBrowser: React.FC = () => {
     if (connectionStatus === 'connected' && !isDemoMode && portRef.current) {
       try {
         await pauseReadLoop();
+        await new Promise((r) => setTimeout(r, 100)); // allow background stream to complete cancellation
         const mcuFiles = await queryFilesystemOverSerial(portRef.current, detectedRuntime || 'compiled', appendLog);
         setFiles(mcuFiles);
         appendLog('INFO', `[Filesystem] Real MCU files loaded successfully (found ${mcuFiles.length} root items).`);
@@ -596,6 +704,7 @@ export const FileBrowser: React.FC = () => {
     } else if (connectionStatus === 'connected' && !isDemoMode && portRef.current) {
       try {
         await pauseReadLoop();
+        await new Promise((r) => setTimeout(r, 100)); // allow background stream to complete cancellation
         const text = await readFileOverSerial(portRef.current, detectedRuntime || 'compiled', file.path, appendLog);
         setFileContent(text);
       } catch (err: any) {
@@ -625,6 +734,12 @@ export const FileBrowser: React.FC = () => {
       appendLog('INFO', '[Filesystem] Packing all script files into ZIP...');
       const zip = new JSZip();
 
+      const isRealConnection = connectionStatus === 'connected' && !isDemoMode && portRef.current;
+      if (isRealConnection) {
+        await pauseReadLoop();
+        await new Promise((r) => setTimeout(r, 100)); // allow background stream to complete cancellation
+      }
+
       const addNodes = async (nodes: FileNode[]) => {
         for (const n of nodes) {
           if (n.type === 'file') {
@@ -632,7 +747,7 @@ export const FileBrowser: React.FC = () => {
             if (n.isLocal && n.handle) {
               const fileObj = await n.handle.getFile();
               text = await fileObj.text();
-            } else if (connectionStatus === 'connected' && !isDemoMode && portRef.current) {
+            } else if (isRealConnection && portRef.current) {
               text = await readFileOverSerial(portRef.current, detectedRuntime || 'compiled', n.path, appendLog);
             } else {
               text = MOCK_FILES[n.path] || `# contents of ${n.name}`;
@@ -645,7 +760,13 @@ export const FileBrowser: React.FC = () => {
         }
       };
 
-      await addNodes(files);
+      try {
+        await addNodes(files);
+      } finally {
+        if (isRealConnection) {
+          resumeReadLoop();
+        }
+      }
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(zipBlob);

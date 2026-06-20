@@ -56,6 +56,10 @@ def detect_runtime(port_data: str, arch: str) -> dict:
     Identifies what runtime environment a connected MCU is running.
     Decodes port_data and performs regex matching.
     """
+    from server.registry.mcu_registry import MCU_REGISTRY
+    profile = MCU_REGISTRY.get(arch)
+    allowed_runtimes = profile.common_runtimes if profile else []
+
     if not port_data:
         return {
             "runtime": "compiled",
@@ -77,13 +81,13 @@ def detect_runtime(port_data: str, arch: str) -> dict:
     lua_ver = re.search(r"NodeMCU\s+([^\s;]+)", data_str, re.IGNORECASE)
     esp_ver = re.search(r"Espruino\s+([^\s;]+)", data_str, re.IGNORECASE)
     
-    if mp_ver:
+    if mp_ver and "micropython" in allowed_runtimes:
         version = mp_ver.group(1)
-    elif cp_ver:
+    elif cp_ver and "circuitpython" in allowed_runtimes:
         version = cp_ver.group(1)
-    elif lua_ver:
+    elif lua_ver and "nodemcu" in allowed_runtimes:
         version = lua_ver.group(1)
-    elif esp_ver:
+    elif esp_ver and "espruino" in allowed_runtimes:
         version = esp_ver.group(1)
 
     # Perform signature matching
@@ -91,28 +95,28 @@ def detect_runtime(port_data: str, arch: str) -> dict:
     confidence = "low"
     
     # CircuitPython signature has higher precedence than generic MicroPython
-    if RUNTIME_SIGNATURES["circuitpython"].search(data_str):
+    if "circuitpython" in allowed_runtimes and RUNTIME_SIGNATURES["circuitpython"].search(data_str):
         detected = "circuitpython"
         confidence = "high" if "CircuitPython" in data_str else "medium"
-    elif RUNTIME_SIGNATURES["micropython"].search(data_str):
+    elif "micropython" in allowed_runtimes and RUNTIME_SIGNATURES["micropython"].search(data_str):
         detected = "micropython"
         confidence = "high" if "MicroPython" in data_str else "medium"
-    elif RUNTIME_SIGNATURES["nodemcu"].search(data_str):
+    elif "nodemcu" in allowed_runtimes and RUNTIME_SIGNATURES["nodemcu"].search(data_str):
         detected = "nodemcu"
         confidence = "high" if any(x in data_str for x in ["NodeMCU", "eLua", "Lua"]) else "medium"
-    elif RUNTIME_SIGNATURES["espruino"].search(data_str):
+    elif "espruino" in allowed_runtimes and RUNTIME_SIGNATURES["espruino"].search(data_str):
         detected = "espruino"
         confidence = "high" if "Espruino" in data_str else "medium"
-    elif RUNTIME_SIGNATURES["at-firmware"].search(data_str):
+    elif "at-firmware" in allowed_runtimes and RUNTIME_SIGNATURES["at-firmware"].search(data_str):
         detected = "at-firmware"
         confidence = "high" if "OK" in data_str else "medium"
-    elif RUNTIME_SIGNATURES["rtos-shell"].search(data_str):
+    elif "rtos-shell" in allowed_runtimes and RUNTIME_SIGNATURES["rtos-shell"].search(data_str):
         detected = "rtos-shell"
         confidence = "high"
-    elif RUNTIME_SIGNATURES["tinybasic"].search(data_str):
+    elif "tinybasic" in allowed_runtimes and RUNTIME_SIGNATURES["tinybasic"].search(data_str):
         detected = "tinybasic"
         confidence = "high"
-    elif RUNTIME_SIGNATURES["forth"].search(data_str):
+    elif "forth" in allowed_runtimes and RUNTIME_SIGNATURES["forth"].search(data_str):
         detected = "forth"
         confidence = "medium"
 
