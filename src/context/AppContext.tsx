@@ -5,6 +5,7 @@ import { useFlashExtractor } from '../hooks/useFlashExtractor';
 import { useBackendHandoff } from '../hooks/useBackendHandoff';
 import { useSmartDetect, DetectStatus, Confidence, RecommendedAction, FilesystemCommands } from '../hooks/useSmartDetect';
 import { useAIExplain, ExplainStatus } from '../hooks/useAIExplain';
+import { MCU_REGISTRY } from '../utils/mcuRegistry';
 
 import type { AnalysisResult } from '../types/analysis';
 import type { ConnectionStatus, TerminalLog, PortMetadata } from '../hooks/useSerialPort';
@@ -227,11 +228,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           serial.portRef.current,
           serial.selectedArch,
           isDemoMode,
-          serial.appendLog
+          serial.appendLog,
+          () => {
+            const mcu = MCU_REGISTRY[serial.selectedArch];
+            const targetSize = mcu?.default_flash_size || 0x400000;
+            extraction.startExtraction(serial.selectedArch, targetSize);
+          }
         );
 
-        // Resume read loop if the recommended action is not file-browser
-        if (res && res.action !== 'file-browser') {
+        // Resume read loop if the recommended action is not file-browser and not extract
+        if (res && res.action !== 'file-browser' && res.action !== 'extract') {
           serial.resumeReadLoop();
         }
       };
@@ -241,7 +247,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       smartDetect.resetDetection();
       setForceBinaryExtraction(false);
     }
-  }, [serial.connectionStatus, serial.selectedArch, isDemoMode]);
+  }, [serial.connectionStatus, serial.selectedArch, isDemoMode, serial.pauseReadLoop, serial.resumeReadLoop, serial.appendLog, extraction.startExtraction]);
 
   // Sync Demo Mode with serial bridge state
   const prevDemoRef = useRef(isDemoMode);

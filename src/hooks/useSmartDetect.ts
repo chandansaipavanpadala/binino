@@ -115,7 +115,8 @@ export const useSmartDetect = () => {
     port: SerialPort | null,
     arch: string,
     isDemoMode: boolean,
-    appendLog: (level: 'INFO' | 'WARN' | 'ERROR' | 'DATA', msg: string) => void
+    appendLog: (level: 'INFO' | 'WARN' | 'ERROR' | 'DATA', msg: string) => void,
+    onProceedToExtraction?: () => void
   ) => {
     // STATE-010: at start of runDetection(), set detectedRuntime=null and detectStatus='probing' before any probe
     setDetectedRuntime(null);
@@ -148,6 +149,10 @@ export const useSmartDetect = () => {
       setRecommendedAction(fallbackResult.action);
       setDetectionMessage(fallbackResult.message);
       setFilesystemCommands(null);
+      if (onProceedToExtraction) {
+        appendLog('INFO', '[SmartDetect] Proceeding to binary extraction — keeping port locked.');
+        onProceedToExtraction();
+      }
       return fallbackResult;
     }
 
@@ -239,6 +244,10 @@ export const useSmartDetect = () => {
         setDetectionMessage('No interpreted runtime detected. Ready for firmware extraction.');
         setFilesystemCommands(null);
         appendLog('INFO', '[SmartDetect] Probes completed. No interpreted runtime found. Proceeding to binary extraction.');
+        if (onProceedToExtraction) {
+          appendLog('INFO', '[SmartDetect] Proceeding to binary extraction — keeping port locked.');
+          onProceedToExtraction();
+        }
         return {
           runtime: 'compiled',
           action: 'extract' as RecommendedAction
@@ -395,6 +404,12 @@ export const useSmartDetect = () => {
       setFilesystemCommands(res.filesystem_commands);
 
       appendLog('INFO', `[SmartDetect] Detection completed. Result: ${res.runtime} (${res.confidence} confidence).`);
+      if (res.action === 'extract') {
+        if (onProceedToExtraction) {
+          appendLog('INFO', '[SmartDetect] Proceeding to binary extraction — keeping port locked.');
+          onProceedToExtraction();
+        }
+      }
       return res;
 
     } catch (err: any) {
@@ -420,6 +435,10 @@ export const useSmartDetect = () => {
       setDetectionMessage(fallbackResult.message);
       setFilesystemCommands(null);
 
+      if (onProceedToExtraction) {
+        appendLog('INFO', '[SmartDetect] Proceeding to binary extraction — keeping port locked.');
+        onProceedToExtraction();
+      }
       return fallbackResult;
     }
   }, []);

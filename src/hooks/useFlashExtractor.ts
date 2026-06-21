@@ -109,6 +109,7 @@ export const useFlashExtractor = ({
 
   const abortRef = useRef<boolean>(false);
   const readBufferRef = useRef<number[]>([]);
+  const isManualBootloaderRetry = useRef<boolean>(false);
 
   // Reset abort ref on mount
   useEffect(() => {
@@ -250,17 +251,27 @@ export const useFlashExtractor = ({
 
   const flushSerialBuffer = async (port: SerialPort, durationMs: number): Promise<void> => {
     if (!port.readable) return;
+    // Get a fresh reader — do NOT reuse any existing reader
     const reader = port.readable.getReader();
     const deadline = Date.now() + durationMs;
+    let flushedBytes = 0;
+
     try {
       while (Date.now() < deadline) {
-        const timeout = deadline - Date.now();
-        if (timeout <= 0) break;
+        const remaining = deadline - Date.now();
         const result = await Promise.race([
           reader.read(),
-          sleep(Math.min(50, timeout)).then(() => ({ done: true, value: undefined }))
-        ]) as { done: boolean; value?: Uint8Array };
-        if (result.done) break;
+          // Short poll interval — keeps checking until full duration elapses
+          new Promise<{done:true,value:undefined}>(r =>
+            setTimeout(() => r({done:true,value:undefined}), Math.min(30, remaining))
+          )
+        ]) as {done:boolean; value?:Uint8Array};
+
+        if (result.value?.length) {
+          flushedBytes += result.value.length;
+          // Keep looping — don't break on data arrival
+        }
+        // Only stop when deadline passes, not when data stops
       }
     } catch {
       // ignore read errors during flush
@@ -269,6 +280,7 @@ export const useFlashExtractor = ({
         reader.releaseLock();
       } catch (_) {}
     }
+    appendLog('INFO', `Buffer flushed (${flushedBytes} bytes discarded).`);
   };
 
 
@@ -553,66 +565,62 @@ export const useFlashExtractor = ({
    * Syncs with the bootloader (handshake sequence).
    */
   const syncBootloader = async (port: SerialPort): Promise<boolean> => {
-    // SYNC payload: [0x07, 0x07, 0x12, 0x20] followed by 32 bytes of 0x55
-    const syncPayload = new Uint8Array(36);
-    syncPayload[0] = 0x07;
-    syncPayload[1] = 0x07;
-    syncPayload[2] = 0x12;
-    syncPayload[3] = 0x20;
-    for (let i = 4; i < 36; i++) {
-      syncPayload[i] = 0x55;
-    }
+    // Exact SLIP-encoded SYNC packet for ESP32 ROM bootloader
+    // Direction=0x00, Opcode=0x08, Size=0x0024(36), Checksum=0x00000000
+    // Payload: [0x07,0x07,0x12,0x20] + [0x55]*32
+    const SYNC_SLIP_PACKET = new Uint8Array([
+      0xC0,                                    // SLIP frame start
+      0x00,                                    // direction: request
+      0x08,                                    // opcode: SYNC
+      0x24, 0x00,                              // data length: 36 LE
+      0x00, 0x00, 0x00, 0x00,                  // checksum: 0
+      0x07, 0x07, 0x12, 0x20,                  // SYNC magic bytes
+      0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,  // 32x 0x55
+      0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
+      0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
+      0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
+      0xC0                                     // SLIP frame end
+    ]); // Total: 46 bytes
 
-    await sleep(600); // wait for bootloader UART to be ready
+    await sleep(600); // Wait for bootloader UART to initialise
 
     for (let attempt = 0; attempt < 10; attempt++) {
       if (abortRef.current) return false;
       appendLog('INFO', `Sending SYNC (attempt ${attempt + 1}/10)...`);
+
+      // Write — get and IMMEDIATELY release writer before reading
+      if (!port.writable) {
+        throw new Error('Port write stream is unavailable.');
+      }
+      const writer = port.writable.getWriter();
       try {
-        // Write SYNC — releases writer lock before read
-        const packet = buildSlipPacket(0x08, syncPayload);
-        if (!port.writable) {
-          throw new Error('Port write stream is unavailable.');
-        }
-        const writer = port.writable.getWriter();
-        await writer.write(packet);
+        await writer.write(SYNC_SLIP_PACKET);
         await writer.ready;
-        writer.releaseLock(); // release BEFORE reading
+      } finally {
+        writer.releaseLock(); // release BEFORE any read
+      }
 
-        // Read exactly ONE response for THIS send
-        const reader = port.readable!.getReader();
-        let response: Uint8Array | null = null;
-        try {
-          response = await readUntilFrameEnd(reader, 800);
-        } finally {
+      await sleep(10); // USB turnaround gap
+
+      // Read one response
+      const reader = port.readable!.getReader();
+      try {
+        const response = await readUntilFrameEnd(reader, 600);
+        const decoded = slipDecode(response);
+        // Valid SYNC ACK: direction=0x01, opcode=0x08
+        if (decoded.length >= 2 && decoded[0] === 0x01 && decoded[1] === 0x08) {
+          appendLog('INFO', 'SYNC acknowledged. Draining stale ACKs...');
           reader.releaseLock();
+          await flushSerialBuffer(port, 200); // drain extra ACKs
+          return true;
         }
-
-        if (response) {
-          const decoded = slipDecode(response);
-          if (decoded[0] === 0x01 && decoded[1] === 0x08) {
-            appendLog('INFO', 'SYNC acknowledged. Draining buffer...');
-            await flushSerialBuffer(port, 200); // clear any extra ACKs
-            appendLog('INFO', 'Buffer clear. Ready for flash commands.');
-            return true;
-          }
-        }
-      } catch (err) {
-        // timeout on this attempt — wait then retry
+      } catch {
+        // timeout — retry
+      } finally {
+        try { reader.releaseLock(); } catch { /* already released */ }
       }
-      await sleep(200 + attempt * 50); // progressive backoff
-    }
 
-    // On SYNC failure: show MCU-specific manual instructions
-    const help = BOOTLOADER_HELP[selectedArch] || [
-      'Sync failed. Please verify hardware connections, baud rate, and boot mode.'
-    ];
-    for (const line of help) {
-      if (line.includes('failed') || line.includes('required')) {
-        appendLog('WARN', line);
-      } else {
-        appendLog('INFO', line);
-      }
+      await sleep(150 + attempt * 50); // backoff
     }
     return false;
   };
@@ -898,16 +906,53 @@ export const useFlashExtractor = ({
 
       } else {
         // --- ESPRESSIF SLIP PROTOCOL (ESP32 / ESP8266) ---
-        // 2. Cycle DTR/RTS resets to boot device in UART bootloader mode
-        await enterBootloaderMode(port);
+        let syncSuccess = false;
 
-        // 3. Handshake SYNC packet
-        const synced = await syncBootloader(port);
-        if (!synced) {
-          setExtractionStatus('error');
-          setErrorMessage('Bootloader SYNC failed. Verify baud rates and boot signals.');
-          resumeReadLoop();
-          return;
+        if (!isManualBootloaderRetry.current) {
+          // ─── ATTEMPT 1: Auto DTR/RTS bootloader entry ───
+          appendLog('INFO', 'Entering bootloader mode via DTR/RTS...');
+          await enterBootloaderMode(port);
+
+          appendLog('INFO', 'Flushing ROM startup bytes (600ms)...');
+          await flushSerialBuffer(port, 600); // flush 74880 baud preamble
+
+          syncSuccess = await syncBootloader(port);
+
+          if (!syncSuccess) {
+            // Set flag so NEXT click skips DTR/RTS entirely
+            isManualBootloaderRetry.current = true;
+            appendLog('WARN', 'Auto entry failed. Manual entry required:');
+            appendLog('INFO', '  1. Hold BOOT/IO0 button on your ESP32');
+            appendLog('INFO', '  2. Press and release EN/RST button once');
+            appendLog('INFO', '  3. Release BOOT button');
+            appendLog('INFO', '  4. Click Extract Firmware within 3 seconds');
+            setErrorMessage('Auto bootloader entry failed. Press BOOT+EN manually.');
+            setExtractionStatus('error');
+            await resumeReadLoop();
+            return;
+          }
+
+        } else {
+          // ─── ATTEMPT 2+: Chip is ALREADY in bootloader mode ───
+          // DO NOT call enterBootloaderMode() — that would reset the chip
+          // and boot into the sketch (BOOT is not being held anymore)
+          isManualBootloaderRetry.current = false; // reset for next session
+
+          appendLog('INFO', 'Manual bootloader mode detected. Skipping DTR/RTS reset.');
+          appendLog('INFO', 'Flushing ROM startup bytes (800ms)...');
+          await flushSerialBuffer(port, 800); // longer — ROM prints more at 74880 baud
+
+          syncSuccess = await syncBootloader(port);
+
+          if (!syncSuccess) {
+            appendLog('ERROR', 'SYNC failed even in manual mode.');
+            appendLog('WARN', 'Check: baud rate 115200? CP2102 driver installed?');
+            appendLog('INFO', 'Try: hold BOOT → tap EN → release BOOT → click Extract immediately.');
+            setErrorMessage('Manual bootloader sync failed.');
+            setExtractionStatus('error');
+            await resumeReadLoop();
+            return;
+          }
         }
 
         // 3.5 Auto Baud Rate Upgrade to 460800
