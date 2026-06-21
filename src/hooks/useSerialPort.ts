@@ -306,12 +306,12 @@ export const useSerialPort = ({ onDisconnect }: UseSerialPortProps = {}) => {
   }, [isBrowserSupported, selectedArch, selectedBaud, appendLog, startReadLoop, cleanupPort, updateAuthorizedPorts]);
 
   // Temporarily suspends the background serial reader loop
-  const pauseReadLoop = useCallback(async () => {
+  const pauseReadLoop = useCallback(async (): Promise<void> => {
     pauseCountRef.current++;
     isReadingRef.current = false;
     if (pauseCountRef.current === 1 && readerRef.current) {
       try {
-        await readerRef.current.cancel();
+        await readerRef.current.cancel(); // MUST await
       } catch (err) {
         console.warn('Error cancelling reader in pause:', err);
       }
@@ -321,8 +321,9 @@ export const useSerialPort = ({ onDisconnect }: UseSerialPortProps = {}) => {
         console.warn('Error releasing reader lock in pause:', err);
       }
       readerRef.current = null;
+      appendLog('INFO', '[Serial] Port released for exclusive access.');
     }
-  }, []);
+  }, [appendLog]);
 
   // Resumes the background serial reader loop
   const resumeReadLoop = useCallback(() => {

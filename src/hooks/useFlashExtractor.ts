@@ -179,22 +179,91 @@ export const useFlashExtractor = ({
     return computed === checksumFromChip;
   };
 
-  const flushSerialBuffer = async (port: SerialPort, timeoutMs = 300): Promise<void> => {
-    if (!port.readable) return;
-    const reader = port.readable.getReader();
+  const buildSlipPacket = (opcode: number, data: Uint8Array): Uint8Array => {
+    const header = new Uint8Array(8);
+    header[0] = 0x00; // direction (0 = Request)
+    header[1] = opcode;
+    header[2] = data.length & 0xFF;
+    header[3] = (data.length >> 8) & 0xFF;
+    // index 4-7 is checksum (default 0)
+
+    const commandPacket = new Uint8Array(8 + data.length);
+    commandPacket.set(header);
+    commandPacket.set(data, 8);
+
+    return slipEncode(commandPacket);
+  };
+
+  const writeSlipPacket = async (
+    port: SerialPort,
+    opcode: number,
+    data: Uint8Array
+  ): Promise<void> => {
+    const packet = buildSlipPacket(opcode, data);
+    if (!port.writable) {
+      throw new Error('Port write stream is unavailable or closed.');
+    }
+    const writer = port.writable.getWriter();
     try {
-      const startTime = Date.now();
-      while (Date.now() - startTime < timeoutMs) {
-        const readPromise = reader.read();
-        const timeoutPromise = new Promise<{ value: undefined; done: boolean }>((resolve) =>
-          setTimeout(() => resolve({ value: undefined, done: false }), 50)
-        );
-        const { value, done } = await Promise.race([readPromise, timeoutPromise]);
-        if (done || value === undefined) {
-          break;
+      await writer.write(packet);
+      await writer.ready; // ensure bytes flushed to USB
+    } finally {
+      writer.releaseLock(); // MUST release before any read attempt
+    }
+  };
+
+  const readUntilFrameEnd = async (
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    timeoutMs: number
+  ): Promise<Uint8Array> => {
+    const chunks: number[] = [];
+    let frameStarted = false;
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+
+      const result = await Promise.race([
+        reader.read(),
+        sleep(remaining).then(() => ({ done: true, value: undefined }))
+      ]) as { done: boolean; value?: Uint8Array };
+
+      if (result.done || !result.value) break;
+
+      for (const byte of result.value) {
+        if (byte === 0xC0) {
+          if (!frameStarted) {
+            frameStarted = true;
+            chunks.push(byte);
+          } else {
+            chunks.push(byte);
+            return new Uint8Array(chunks); // complete frame
+          }
+        } else if (frameStarted) {
+          chunks.push(byte);
         }
       }
-    } catch (_) {
+    }
+    throw new Error(`SLIP frame timeout after ${timeoutMs}ms`);
+  };
+
+  const flushSerialBuffer = async (port: SerialPort, durationMs: number): Promise<void> => {
+    if (!port.readable) return;
+    const reader = port.readable.getReader();
+    const deadline = Date.now() + durationMs;
+    try {
+      while (Date.now() < deadline) {
+        const timeout = deadline - Date.now();
+        if (timeout <= 0) break;
+        const result = await Promise.race([
+          reader.read(),
+          sleep(Math.min(50, timeout)).then(() => ({ done: true, value: undefined }))
+        ]) as { done: boolean; value?: Uint8Array };
+        if (result.done) break;
+      }
+    } catch {
+      // ignore read errors during flush
     } finally {
       try {
         reader.releaseLock();
@@ -202,27 +271,6 @@ export const useFlashExtractor = ({
     }
   };
 
-  const drainStaleResponses = async (port: SerialPort, waitMs = 300): Promise<void> => {
-    if (!port.readable) return;
-    const reader = port.readable.getReader();
-    const deadline = Date.now() + waitMs;
-    try {
-      while (Date.now() < deadline) {
-        const result = await Promise.race([
-          reader.read(),
-          new Promise<{ value: undefined; done: boolean }>((resolve) =>
-            setTimeout(() => resolve({ value: undefined, done: true }), 50)
-          ),
-        ]);
-        if (result.done) break;
-      }
-    } catch (_) {
-    } finally {
-      try {
-        reader.releaseLock();
-      } catch (_) {}
-    }
-  };
 
   const readBytes = async (
     reader: ReadableStreamDefaultReader<Uint8Array>,
@@ -432,70 +480,7 @@ export const useFlashExtractor = ({
     return resp.slice(2, 2 + size);
   };
 
-  /**
-   * Reads next available SLIP packet from the serial reader.
-   */
-  const readSlipPacket = async (
-    reader: ReadableStreamDefaultReader<Uint8Array>,
-    timeoutMs: number
-  ): Promise<Uint8Array> => {
-    let timer: any;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error('Timeout waiting for response')), timeoutMs);
-    });
 
-    const readPromise = async (): Promise<Uint8Array> => {
-      const extractPacket = (): Uint8Array | null => {
-        const buf = readBufferRef.current;
-        let firstC0 = buf.indexOf(0xC0);
-        if (firstC0 === -1) return null;
-
-        let secondC0 = buf.indexOf(0xC0, firstC0 + 1);
-        while (secondC0 !== -1) {
-          if (secondC0 === firstC0 + 1) {
-            // Consecutive C0s - slide window
-            firstC0 = secondC0;
-            secondC0 = buf.indexOf(0xC0, firstC0 + 1);
-            continue;
-          }
-          const rawPacket = new Uint8Array(buf.slice(firstC0 + 1, secondC0));
-          readBufferRef.current = buf.slice(secondC0 + 1);
-          return rawPacket;
-        }
-        return null;
-      };
-
-      // Check existing buffer
-      const packet = extractPacket();
-      if (packet) {
-        clearTimeout(timer);
-        return slipDecode(packet);
-      }
-
-      // Read chunks from reader
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) throw new Error('Serial reader stream closed unexpectedly');
-        if (value) {
-          for (let i = 0; i < value.length; i++) {
-            readBufferRef.current.push(value[i]);
-          }
-        }
-        const packet = extractPacket();
-        if (packet) {
-          clearTimeout(timer);
-          return slipDecode(packet);
-        }
-      }
-    };
-
-    try {
-      return await Promise.race([readPromise(), timeoutPromise]);
-    } catch (err) {
-      clearTimeout(timer);
-      throw err;
-    }
-  };
 
   /**
    * Sends a SLIP command and awaits a matching response from the device.
@@ -506,38 +491,13 @@ export const useFlashExtractor = ({
     payload: Uint8Array,
     timeoutMs = 1000
   ): Promise<{ value: number; body: Uint8Array; decoded: Uint8Array }> => {
-    // 1. Build esptool standard header (8 bytes)
-    const header = new Uint8Array(8);
-    header[0] = 0x00; // direction (0 = Request)
-    header[1] = opcode;
-    header[2] = payload.length & 0xFF;
-    header[3] = (payload.length >> 8) & 0xFF;
-    // index 4-7 is checksum (default 0)
+    await writeSlipPacket(port, opcode, payload); // write + release lock
+    await sleep(10); // small gap — gives USB time between write and read
 
-    // Assemble packet
-    const commandPacket = new Uint8Array(8 + payload.length);
-    commandPacket.set(header);
-    commandPacket.set(payload, 8);
-
-    // SLIP encode
-    const encoded = slipEncode(commandPacket);
-
-    // Send packet
-    if (!port.writable || !port.readable) {
-      throw new Error('Port serial channels are unavailable or closed.');
-    }
-    const writer = port.writable.getWriter();
-    try {
-      await writer.write(encoded);
-    } finally {
-      writer.releaseLock();
-    }
-
-    // Await response packet
-    const reader = port.readable.getReader();
+    const reader = port.readable!.getReader();
     try {
       for (let attempt = 0; attempt < 5; attempt++) {
-        const responseDecoded = await readSlipPacket(reader, timeoutMs);
+        const responseDecoded = await readUntilFrameEnd(reader, timeoutMs);
         
         if (responseDecoded.length < 8) {
           throw new Error('Response packet header too short');
@@ -580,11 +540,10 @@ export const useFlashExtractor = ({
       await port.setSignals({ dataTerminalReady: true, requestToSend: true });  // EN LOW (reset)
       await sleep(100);
       await port.setSignals({ dataTerminalReady: true, requestToSend: false }); // EN HIGH (start)
-      await sleep(500); // CRITICAL: bootloader takes 400ms to init UART
+      await sleep(500); // wait for bootloader to init UART
       await port.setSignals({ dataTerminalReady: false, requestToSend: false }); // GPIO0 release
-      await sleep(100);
-      // Flush serial buffer (discard ADC/sketch output that printed during reset):
-      await flushSerialBuffer(port, 300);
+      await sleep(50);
+      await flushSerialBuffer(port, 600); // flush full ROM startup message
     } catch (e: any) {
       appendLog('WARN', `[Bootloader] Failed to set DTR/RTS signals: ${e.message || e}. If device fails to sync, press BOOT/BOOT0/RESET manually.`);
     }
@@ -594,8 +553,6 @@ export const useFlashExtractor = ({
    * Syncs with the bootloader (handshake sequence).
    */
   const syncBootloader = async (port: SerialPort): Promise<boolean> => {
-    appendLog('INFO', 'Sending SYNC...');
-    
     // SYNC payload: [0x07, 0x07, 0x12, 0x20] followed by 32 bytes of 0x55
     const syncPayload = new Uint8Array(36);
     syncPayload[0] = 0x07;
@@ -606,20 +563,44 @@ export const useFlashExtractor = ({
       syncPayload[i] = 0x55;
     }
 
+    await sleep(600); // wait for bootloader UART to be ready
+
     for (let attempt = 0; attempt < 10; attempt++) {
       if (abortRef.current) return false;
-      await sleep(attempt === 0 ? 600 : 200 + attempt * 100);
-      
+      appendLog('INFO', `Sending SYNC (attempt ${attempt + 1}/10)...`);
       try {
-        readBufferRef.current = []; // Reset reader buffer
-        await sendCommand(port, 0x08, syncPayload, 500);
-        appendLog('INFO', 'SYNC acknowledged. Draining stale ACK buffer...');
-        await drainStaleResponses(port, 300);
-        appendLog('INFO', 'Buffer clear. Ready for flash commands.');
-        return true;
+        // Write SYNC — releases writer lock before read
+        const packet = buildSlipPacket(0x08, syncPayload);
+        if (!port.writable) {
+          throw new Error('Port write stream is unavailable.');
+        }
+        const writer = port.writable.getWriter();
+        await writer.write(packet);
+        await writer.ready;
+        writer.releaseLock(); // release BEFORE reading
+
+        // Read exactly ONE response for THIS send
+        const reader = port.readable!.getReader();
+        let response: Uint8Array | null = null;
+        try {
+          response = await readUntilFrameEnd(reader, 800);
+        } finally {
+          reader.releaseLock();
+        }
+
+        if (response) {
+          const decoded = slipDecode(response);
+          if (decoded[0] === 0x01 && decoded[1] === 0x08) {
+            appendLog('INFO', 'SYNC acknowledged. Draining buffer...');
+            await flushSerialBuffer(port, 200); // clear any extra ACKs
+            appendLog('INFO', 'Buffer clear. Ready for flash commands.');
+            return true;
+          }
+        }
       } catch (err) {
-        console.warn(`SYNC attempt ${attempt + 1}/10 failed...`);
+        // timeout on this attempt — wait then retry
       }
+      await sleep(200 + attempt * 50); // progressive backoff
     }
 
     // On SYNC failure: show MCU-specific manual instructions
@@ -779,26 +760,24 @@ export const useFlashExtractor = ({
 
       if (isAvr) {
         // --- AVR STK500v1 / STK500v2 PROTOCOLS ---
-        const portInfo = await port.getInfo();
-        const isftdi = portInfo.usbVendorId === 0x0403; // FTDI FT232R
-        const isCH340 = portInfo.usbVendorId === 0x1A86; // CH340 (Chinese Nano clones)
-
-        const resetArduino = async (p: SerialPort): Promise<void> => {
+        const resetForArduino = async (p: SerialPort): Promise<void> => {
           try {
+            const info = await p.getInfo();
+            const isftdi = info.usbVendorId === 0x0403;
+            const isCH340 = info.usbVendorId === 0x1A86;
+
             if (isftdi || isCH340) {
-              // FTDI FT232R and CH340: DTR=false pulses RST LOW via capacitor
-              // Opposite polarity from CP2102
+              // FTDI + CH340: DTR false=reset LOW (inverted from CP2102)
               await p.setSignals({ dataTerminalReady: false });
-              await sleep(150);  // hold reset
+              await sleep(150);
               await p.setSignals({ dataTerminalReady: true });
-              await sleep(200);  // wait for bootloader to start
             } else {
-              // CP2102 and others: DTR=true then false
+              // CP2102, others
               await p.setSignals({ dataTerminalReady: true });
               await sleep(100);
               await p.setSignals({ dataTerminalReady: false });
-              await sleep(200);
             }
+            await sleep(200);
           } catch (e: any) {
             console.warn('Failed to set DTR reset:', e);
           }
@@ -820,18 +799,19 @@ export const useFlashExtractor = ({
         }, 1000);
 
         try {
+          const info = await port.getInfo();
+          const isftdi = info.usbVendorId === 0x0403;
+
           if (profile.protocol === 'STK500v2') {
             appendLog('INFO', `Starting STK500v2 bootloader handshake at ${currentBaud} baud...`);
-            await resetArduino(port);
+            await resetForArduino(port);
             await flushSerialBuffer(port, 300);
             stkSynced = await syncSTK500v2(port);
           } else {
             // STK500v1: try bauds in sequence
-            const ARDUINO_BAUD_SEQUENCE = isftdi
-              ? [57600, 115200]   // FTDI original Nano: try 57600 FIRST
-              : [115200, 57600];  // CH340 clone Nano: try 115200 first
+            const baudOrder = isftdi ? [57600, 115200] : [115200, 57600];
 
-            for (const baud of ARDUINO_BAUD_SEQUENCE) {
+            for (const baud of baudOrder) {
               try {
                 if (port.readable || (port as any).writable) {
                   await port.close();
@@ -840,15 +820,15 @@ export const useFlashExtractor = ({
               
               await port.open({ baudRate: baud });
               currentBaud = baud;
-              appendLog('INFO', `Attempting STK500v1 SYNC at ${baud} baud...`);
-              await resetArduino(port);
+              appendLog('INFO', `Trying ATmega328P at ${baud} baud...`);
+              await resetForArduino(port);
               await flushSerialBuffer(port, 300);
               if (await syncSTK500v1(port)) {
-                appendLog('INFO', `SYNC success at ${baud} baud.`);
+                appendLog('INFO', `Arduino SYNC OK at ${baud} baud.`);
                 stkSynced = true;
                 break;
               }
-              appendLog('WARN', `SYNC failed at ${baud} — trying next baud rate...`);
+              appendLog('WARN', `Failed at ${baud} — trying next...`);
             }
           }
         } catch (err) {
