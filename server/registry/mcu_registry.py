@@ -18,6 +18,8 @@ class MCUProfile:
     supported: bool = True
     common_runtimes: List[str] = field(default_factory=list)
     detection_notes: str = ""
+    usb_vendor_ids: List[int] = field(default_factory=list)
+    baud_by_vendor: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -157,7 +159,13 @@ MCU_REGISTRY = {
         read_protected=False,
         supported=True,
         common_runtimes=['compiled'],
-        detection_notes="Probing interface for compiled binary firmware."
+        detection_notes="Probing interface for compiled binary firmware.",
+        usb_vendor_ids=[0x2341, 0x0403, 0x1A86, 0x10C4],
+        baud_by_vendor={
+            0x0403: [57600, 115200],  # FTDI original Nano
+            0x1A86: [115200, 57600],  # CH340 clone
+            0x2341: [115200],         # genuine Arduino
+        }
     ),
     "atmega2560": MCUProfile(
         mcu_id="atmega2560",

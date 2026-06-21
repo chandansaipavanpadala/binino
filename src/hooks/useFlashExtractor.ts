@@ -202,6 +202,28 @@ export const useFlashExtractor = ({
     }
   };
 
+  const drainStaleResponses = async (port: SerialPort, waitMs = 300): Promise<void> => {
+    if (!port.readable) return;
+    const reader = port.readable.getReader();
+    const deadline = Date.now() + waitMs;
+    try {
+      while (Date.now() < deadline) {
+        const result = await Promise.race([
+          reader.read(),
+          new Promise<{ value: undefined; done: boolean }>((resolve) =>
+            setTimeout(() => resolve({ value: undefined, done: true }), 50)
+          ),
+        ]);
+        if (result.done) break;
+      }
+    } catch (_) {
+    } finally {
+      try {
+        reader.releaseLock();
+      } catch (_) {}
+    }
+  };
+
   const readBytes = async (
     reader: ReadableStreamDefaultReader<Uint8Array>,
     length: number,
@@ -514,26 +536,33 @@ export const useFlashExtractor = ({
     // Await response packet
     const reader = port.readable.getReader();
     try {
-      const responseDecoded = await readSlipPacket(reader, timeoutMs);
-      
-      if (responseDecoded.length < 8) {
-        throw new Error('Response packet header too short');
-      }
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const responseDecoded = await readSlipPacket(reader, timeoutMs);
+        
+        if (responseDecoded.length < 8) {
+          throw new Error('Response packet header too short');
+        }
 
-      const respDirection = responseDecoded[0];
-      const respOpcode = responseDecoded[1];
-      const respSize = responseDecoded[2] | (responseDecoded[3] << 8);
-      const respValue = responseDecoded[4] | (responseDecoded[5] << 8) | (responseDecoded[6] << 16) | (responseDecoded[7] << 24);
-      const respBody = responseDecoded.slice(8, 8 + respSize);
+        const respDirection = responseDecoded[0];
+        const respOpcode = responseDecoded[1];
+        const respSize = responseDecoded[2] | (responseDecoded[3] << 8);
+        const respValue = responseDecoded[4] | (responseDecoded[5] << 8) | (responseDecoded[6] << 16) | (responseDecoded[7] << 24);
+        const respBody = responseDecoded.slice(8, 8 + respSize);
 
-      if (respDirection !== 0x01) {
-        throw new Error(`Invalid direction: expected 0x01, got 0x${respDirection.toString(16)}`);
-      }
-      if (respOpcode !== opcode) {
+        if (respDirection !== 0x01) {
+          throw new Error(`Invalid direction: expected 0x01, got 0x${respDirection.toString(16)}`);
+        }
+        if (respOpcode === opcode) {
+          return { value: respValue, body: respBody, decoded: responseDecoded };
+        }
+        if (respOpcode === 0x08 && opcode !== 0x08) {
+          // Stale SYNC ACK — discard and read next packet
+          appendLog('WARN', `Discarding stale SYNC ACK while waiting for opcode 0x${opcode.toString(16)}`);
+          continue;
+        }
         throw new Error(`Opcode mismatch: expected 0x${opcode.toString(16)}, got 0x${respOpcode.toString(16)}`);
       }
-
-      return { value: respValue, body: respBody, decoded: responseDecoded };
+      throw new Error('Too many stale packets — could not get valid response');
     } finally {
       reader.releaseLock();
     }
@@ -577,19 +606,19 @@ export const useFlashExtractor = ({
       syncPayload[i] = 0x55;
     }
 
-    await sleep(600); // wait before first SYNC — chip needs 400ms+
-    
     for (let attempt = 0; attempt < 10; attempt++) {
       if (abortRef.current) return false;
+      await sleep(attempt === 0 ? 600 : 200 + attempt * 100);
       
       try {
         readBufferRef.current = []; // Reset reader buffer
         await sendCommand(port, 0x08, syncPayload, 500);
-        appendLog('INFO', 'SYNC acknowledged. Chip ready.');
+        appendLog('INFO', 'SYNC acknowledged. Draining stale ACK buffer...');
+        await drainStaleResponses(port, 300);
+        appendLog('INFO', 'Buffer clear. Ready for flash commands.');
         return true;
       } catch (err) {
         console.warn(`SYNC attempt ${attempt + 1}/10 failed...`);
-        await sleep(200 + attempt * 100); // progressive: 200ms, 300ms, 400ms...
       }
     }
 
@@ -750,20 +779,33 @@ export const useFlashExtractor = ({
 
       if (isAvr) {
         // --- AVR STK500v1 / STK500v2 PROTOCOLS ---
+        const portInfo = await port.getInfo();
+        const isftdi = portInfo.usbVendorId === 0x0403; // FTDI FT232R
+        const isCH340 = portInfo.usbVendorId === 0x1A86; // CH340 (Chinese Nano clones)
+
+        const resetArduino = async (p: SerialPort): Promise<void> => {
+          try {
+            if (isftdi || isCH340) {
+              // FTDI FT232R and CH340: DTR=false pulses RST LOW via capacitor
+              // Opposite polarity from CP2102
+              await p.setSignals({ dataTerminalReady: false });
+              await sleep(150);  // hold reset
+              await p.setSignals({ dataTerminalReady: true });
+              await sleep(200);  // wait for bootloader to start
+            } else {
+              // CP2102 and others: DTR=true then false
+              await p.setSignals({ dataTerminalReady: true });
+              await sleep(100);
+              await p.setSignals({ dataTerminalReady: false });
+              await sleep(200);
+            }
+          } catch (e: any) {
+            console.warn('Failed to set DTR reset:', e);
+          }
+        };
+
         let currentBaud = profile.default_baud || 115200;
         let stkSynced = false;
-
-        appendLog('INFO', `Starting AVR bootloader handshake at ${currentBaud} baud...`);
-        
-        // Auto reset toggle via DTR line
-        try {
-          await port.setSignals({ dataTerminalReady: false });
-          await sleep(100);
-          await port.setSignals({ dataTerminalReady: true });
-          await sleep(100);
-        } catch (e: any) {
-          console.warn('Failed to set DTR reset:', e);
-        }
 
         // Show countdown in terminal
         appendLog('WARN', `Arduino bootloader window: 8 seconds. Starting extraction...`);
@@ -779,49 +821,40 @@ export const useFlashExtractor = ({
 
         try {
           if (profile.protocol === 'STK500v2') {
+            appendLog('INFO', `Starting STK500v2 bootloader handshake at ${currentBaud} baud...`);
+            await resetArduino(port);
+            await flushSerialBuffer(port, 300);
             stkSynced = await syncSTK500v2(port);
           } else {
-            stkSynced = await syncSTK500v1(port);
+            // STK500v1: try bauds in sequence
+            const ARDUINO_BAUD_SEQUENCE = isftdi
+              ? [57600, 115200]   // FTDI original Nano: try 57600 FIRST
+              : [115200, 57600];  // CH340 clone Nano: try 115200 first
+
+            for (const baud of ARDUINO_BAUD_SEQUENCE) {
+              try {
+                if (port.readable || (port as any).writable) {
+                  await port.close();
+                }
+              } catch (_) {}
+              
+              await port.open({ baudRate: baud });
+              currentBaud = baud;
+              appendLog('INFO', `Attempting STK500v1 SYNC at ${baud} baud...`);
+              await resetArduino(port);
+              await flushSerialBuffer(port, 300);
+              if (await syncSTK500v1(port)) {
+                appendLog('INFO', `SYNC success at ${baud} baud.`);
+                stkSynced = true;
+                break;
+              }
+              appendLog('WARN', `SYNC failed at ${baud} — trying next baud rate...`);
+            }
           }
         } catch (err) {
           console.warn('Sync failed', err);
         } finally {
           clearInterval(countdown);
-        }
-
-        // Fallback for STK500v1 Chinese Nano clones (115200 -> 57600)
-        if (!stkSynced && arch === 'atmega328p' && currentBaud === 115200) {
-          appendLog('WARN', 'Sync failed at 115200. Retrying at 57600 baud fallback...');
-          currentBaud = 57600;
-          await port.close();
-          await port.open({ baudRate: currentBaud });
-
-          try {
-            await port.setSignals({ dataTerminalReady: false });
-            await sleep(100);
-            await port.setSignals({ dataTerminalReady: true });
-            await sleep(100);
-          } catch (e: any) {
-            console.warn('Failed to set DTR reset:', e);
-          }
-
-          let remainingFallback = 8;
-          const countdownFallback = setInterval(() => {
-            remainingFallback--;
-            if (remainingFallback > 0) {
-              appendLog('INFO', `Bootloader window: ${remainingFallback}s remaining...`);
-            } else {
-              clearInterval(countdownFallback);
-            }
-          }, 1000);
-
-          try {
-            stkSynced = await syncSTK500v1(port);
-          } catch (err) {
-            console.warn('Fallback sync failed', err);
-          } finally {
-            clearInterval(countdownFallback);
-          }
         }
 
         if (!stkSynced) {

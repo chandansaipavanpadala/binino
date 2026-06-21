@@ -14,6 +14,8 @@ export interface MCUProfile {
   supported?: boolean;
   common_runtimes: string[];
   detection_notes: string;
+  usb_vendor_ids?: number[];
+  baud_by_vendor?: Record<number, number[]>;
 }
 
 export const MCU_REGISTRY: Record<string, MCUProfile> = {
@@ -225,7 +227,13 @@ export const MCU_REGISTRY: Record<string, MCUProfile> = {
     common_runtimes: [
         "compiled"
     ],
-    detection_notes: "Probing interface for compiled binary firmware."
+    detection_notes: "Probing interface for compiled binary firmware.",
+    usb_vendor_ids: [0x2341, 0x0403, 0x1A86, 0x10C4],
+    baud_by_vendor: {
+        0x0403: [57600, 115200],  // FTDI original Nano
+        0x1A86: [115200, 57600],  // CH340 clone
+        0x2341: [115200],         // genuine Arduino
+    }
   },
   "atmega2560": {
     mcu_id: "atmega2560",
